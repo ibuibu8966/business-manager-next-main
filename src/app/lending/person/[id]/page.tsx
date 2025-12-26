@@ -179,8 +179,9 @@ function PersonDetailContent() {
                             <span key={tag} className="badge badge-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                 {tag}
                                 <button
-                                    onClick={() => removeTag(tag)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginLeft: '0.25rem' }}
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginLeft: '0.25rem', color: 'inherit' }}
                                 >
                                     ×
                                 </button>
