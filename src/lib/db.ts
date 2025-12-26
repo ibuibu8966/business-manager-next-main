@@ -148,11 +148,25 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         key: K,
         updater: (items: Database[K]) => Database[K]
     ) => {
-        if (!db) return;
+        // 関数型更新を使用して最新の状態を取得
+        let newDbResult: Database | null = null;
 
-        const oldItems = db[key];
-        const newItems = updater(oldItems);
-        const newDb = { ...db, [key]: newItems };
+        setDb(currentDb => {
+            if (!currentDb) return currentDb;
+
+            const oldItems = currentDb[key];
+            const newItems = updater(oldItems);
+            newDbResult = { ...currentDb, [key]: newItems };
+            return newDbResult;
+        });
+
+        // setDbの更新が完了するまで少し待つ
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        if (!newDbResult) return;
+        const newDb = newDbResult;
+        const oldItems = db?.[key] || ([] as unknown as Database[K]);
+        const newItems = newDb[key];
 
         if (useSupabaseState && supabase) {
             const tableName = tableNames[key as keyof typeof tableNames];
@@ -216,8 +230,6 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         } else {
             saveToLocalStorage(newDb);
         }
-
-        setDb(newDb);
     }, [db, useSupabaseState]);
 
     return createElement(
