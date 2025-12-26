@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const navItems = [
     { path: '/', icon: '📊', label: 'ダッシュボード' },
+    { path: '/kpi', icon: '🎯', label: 'KPI達成率' },
     { path: '/tasks', icon: '✅', label: 'タスク管理' },
     { path: '/tickets', icon: '🎫', label: 'チケット管理' },
     { path: '/customers', icon: '👥', label: '顧客・対応履歴' },
