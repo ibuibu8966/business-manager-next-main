@@ -59,12 +59,18 @@ export interface Account {
     id: number;
     name: string;
     businessId?: number;
+    balance?: number;         // 残高（手動入力）
+    tags?: string[];          // タグ（複数可）
+    isArchived?: boolean;     // アーカイブフラグ
 }
 
 export interface Person {
     id: number;
     name: string;
     memo?: string;
+    businessId?: number;      // 事業紐づけ
+    tags?: string[];          // タグ（複数可）
+    isArchived?: boolean;     // アーカイブフラグ
 }
 
 export interface Lending {
@@ -150,6 +156,26 @@ export interface Notification {
     createdAt: string;
 }
 
+// 口座取引（移転・利息・運用益）
+export interface AccountTransaction {
+    id: number;
+    type: 'transfer' | 'interest' | 'investment_gain';
+    fromAccountId?: number;   // 移転元口座（transferの場合）
+    toAccountId?: number;     // 移転先口座（transferの場合）
+    accountId?: number;       // 対象口座（interest/investment_gainの場合）
+    amount: number;
+    date: string;
+    memo?: string;
+    createdAt: string;
+}
+
+// タグマスタ
+export interface Tag {
+    id: number;
+    name: string;
+    color?: string;
+}
+
 // Database interface
 export interface Database {
     users: User[];
@@ -168,5 +194,7 @@ export interface Database {
     manuals: Manual[];
     taskHistories: TaskHistory[];
     notifications: Notification[];
+    accountTransactions: AccountTransaction[];
+    tags: Tag[];
 }
 

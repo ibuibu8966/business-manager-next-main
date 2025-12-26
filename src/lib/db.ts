@@ -15,6 +15,8 @@ const DEFAULT_CATEGORIES: Category[] = [
     { id: 8, type: 'expense', name: 'サブスク' },
     { id: 9, type: 'expense', name: '人件費' },
     { id: 10, type: 'expense', name: 'その他経費' },
+    { id: 11, type: 'income', name: '受取利息' },
+    { id: 12, type: 'income', name: '運用益' },
 ];
 
 const DEFAULT_DB: Database = {
@@ -34,6 +36,8 @@ const DEFAULT_DB: Database = {
     manuals: [],
     taskHistories: [],
     notifications: [],
+    accountTransactions: [],
+    tags: [],
 };
 
 // LocalStorageからロード

@@ -38,6 +38,8 @@ export const tableNames = {
   manuals: 'manuals',
   taskHistories: 'task_histories',
   notifications: 'notifications',
+  accountTransactions: 'account_transactions',
+  tags: 'tags',
 } as const;
 
 // カラム名変換（camelCase → snake_case）
