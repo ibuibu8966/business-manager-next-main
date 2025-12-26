@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode, createElement } from 'react';
 import { Database, Category } from '@/types';
 import { supabase, isSupabaseConfigured, tableNames, toSnakeCase, toCamelCase } from './supabase';
 
@@ -84,10 +84,21 @@ async function loadFromSupabase(): Promise<Database> {
     return loadedDb;
 }
 
-export function useDatabase() {
+// DatabaseContext の型定義
+interface DatabaseContextType {
+    db: Database | null;
+    isLoading: boolean;
+    saveDb: (newDb: Database) => void;
+    updateCollection: <K extends keyof Database>(key: K, updater: (items: Database[K]) => Database[K]) => Promise<void>;
+    useSupabase: boolean;
+}
+
+const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
+
+export function DatabaseProvider({ children }: { children: ReactNode }) {
     const [db, setDb] = useState<Database | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [useSupabase, setUseSupabase] = useState(false);
+    const [useSupabaseState, setUseSupabaseState] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -103,11 +114,11 @@ export function useDatabase() {
                     const supabaseDb = await loadFromSupabase();
                     console.log('Supabase data loaded:', supabaseDb);
                     setDb(supabaseDb);
-                    setUseSupabase(true);
+                    setUseSupabaseState(true);
                 } catch (e) {
                     console.error('Supabase load/connection failed, falling back to LocalStorage', e);
                     setDb(loadFromLocalStorage());
-                    setUseSupabase(false); // 念のため明示的にfalse
+                    setUseSupabaseState(false);
                 }
             } else {
                 console.log('Using LocalStorage (Supabase not configured)');
@@ -119,7 +130,7 @@ export function useDatabase() {
     }, []);
 
     const saveDb = useCallback((newDb: Database) => {
-        if (useSupabase) {
+        if (useSupabaseState) {
             // Supabaseモードでも一旦ローカル状態を更新
             setDb(newDb);
             // 注: 個別の更新はupdateCollectionで行う
@@ -127,7 +138,7 @@ export function useDatabase() {
             saveToLocalStorage(newDb);
             setDb(newDb);
         }
-    }, [useSupabase]);
+    }, [useSupabaseState]);
 
     const updateCollection = useCallback(async <K extends keyof Database>(
         key: K,
@@ -139,7 +150,7 @@ export function useDatabase() {
         const newItems = updater(oldItems);
         const newDb = { ...db, [key]: newItems };
 
-        if (useSupabase && supabase) {
+        if (useSupabaseState && supabase) {
             const tableName = tableNames[key as keyof typeof tableNames];
 
             // 追加されたアイテムを検出
@@ -203,9 +214,21 @@ export function useDatabase() {
         }
 
         setDb(newDb);
-    }, [db, useSupabase]);
+    }, [db, useSupabaseState]);
 
-    return { db, isLoading, saveDb, updateCollection, useSupabase };
+    return createElement(
+        DatabaseContext.Provider,
+        { value: { db, isLoading, saveDb, updateCollection, useSupabase: useSupabaseState } },
+        children
+    );
+}
+
+export function useDatabase() {
+    const context = useContext(DatabaseContext);
+    if (!context) {
+        throw new Error('useDatabase must be used within DatabaseProvider');
+    }
+    return context;
 }
 
 export function genId<T extends { id: number | string }>(arr: T[]): number {

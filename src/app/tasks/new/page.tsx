@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
 import { useDatabase, genId } from '@/lib/db';
@@ -111,17 +111,9 @@ function NewTaskContent() {
     );
 }
 
-function NewTaskPage() {
+export default function NewTaskPage() {
     const { user, isLoading } = useAuth();
     if (isLoading) return <div>Loading...</div>;
     if (!user) return <LoginForm />;
     return <NewTaskContent />;
-}
-
-export default function Page() {
-    return (
-        <AuthProvider>
-            <NewTaskPage />
-        </AuthProvider>
-    );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
 import { useDatabase, genId } from '@/lib/db';
@@ -139,17 +139,9 @@ function CustomersContent() {
     );
 }
 
-function CustomersPage() {
+export default function CustomersPage() {
     const { user, isLoading } = useAuth();
     if (isLoading) return <div>Loading...</div>;
     if (!user) return <LoginForm />;
     return <CustomersContent />;
-}
-
-export default function Page() {
-    return (
-        <AuthProvider>
-            <CustomersPage />
-        </AuthProvider>
-    );
 }

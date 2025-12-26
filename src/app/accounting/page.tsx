@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
 import { useDatabase, genId } from '@/lib/db';
@@ -383,17 +383,9 @@ function AccountingContent() {
     );
 }
 
-function AccountingPage() {
+export default function AccountingPage() {
     const { user, isLoading } = useAuth();
     if (isLoading) return <div>Loading...</div>;
     if (!user) return <LoginForm />;
     return <AccountingContent />;
-}
-
-export default function Page() {
-    return (
-        <AuthProvider>
-            <AccountingPage />
-        </AuthProvider>
-    );
 }

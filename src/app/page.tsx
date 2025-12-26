@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
-import { useDatabase, genId } from '@/lib/db';
+import { useDatabase } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
 
 function DashboardContent() {
@@ -263,9 +263,5 @@ function AppContent() {
 }
 
 export default function HomePage() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
+  return <AppContent />;
 }
