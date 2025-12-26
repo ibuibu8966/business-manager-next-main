@@ -96,11 +96,11 @@ function TasksContent() {
 
         const taskData = {
             title: formData.get('title') as string,
-            description: formData.get('description') as string,
+            description: (formData.get('description') as string) || undefined,
             status: formData.get('status') as Task['status'],
             priority: formData.get('priority') as Task['priority'],
-            dueDate: formData.get('dueDate') as string,
-            showAfter: formData.get('showAfter') as string || undefined,
+            dueDate: (formData.get('dueDate') as string) || undefined,
+            showAfter: (formData.get('showAfter') as string) || undefined,
             businessId: formData.get('businessId') ? Number(formData.get('businessId')) : undefined,
             assigneeId: formData.get('assigneeId') ? Number(formData.get('assigneeId')) : undefined,
             userId: user?.id || 1,
@@ -116,7 +116,10 @@ function TasksContent() {
                 ...tasks,
                 { id: newId, ...taskData, createdAt: new Date().toISOString() }
             ]);
-            addHistory(newId, 'created', 'タスクを作成');
+            // タスクがSupabaseに保存されるのを待ってから履歴を追加
+            setTimeout(() => {
+                addHistory(newId, 'created', 'タスクを作成');
+            }, 100);
         }
         setModalOpen(false);
     };
