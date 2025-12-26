@@ -18,6 +18,7 @@ export interface Task {
     description?: string;
     userId: number;
     businessId?: number;
+    assigneeId?: number;         // 担当者（ユーザーID）
     status: '未着手' | '進行中' | '完了';
     priority?: 'high' | 'medium' | 'low';
     dueDate?: string;
@@ -139,7 +140,7 @@ export interface Manual {
 export interface TaskHistory {
     id: number;
     taskId: number;
-    action: 'created' | 'status' | 'memo' | 'reminder' | 'assignee';
+    action: 'created' | 'status' | 'memo' | 'reminder' | 'assignee' | 'deleted' | 'updated';
     description: string;
     userId: number;
     createdAt: string;

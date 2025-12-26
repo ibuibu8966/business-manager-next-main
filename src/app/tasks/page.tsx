@@ -101,6 +101,8 @@ function TasksContent() {
             priority: formData.get('priority') as Task['priority'],
             dueDate: formData.get('dueDate') as string,
             showAfter: formData.get('showAfter') as string || undefined,
+            businessId: formData.get('businessId') ? Number(formData.get('businessId')) : undefined,
+            assigneeId: formData.get('assigneeId') ? Number(formData.get('assigneeId')) : undefined,
             userId: user?.id || 1,
         };
 
@@ -136,7 +138,11 @@ function TasksContent() {
     };
 
     const deleteTask = (id: number) => {
+        const task = db.tasks.find(t => t.id === id);
+        if (!task) return;
+
         if (confirm('このタスクを削除しますか？')) {
+            addHistory(id, 'deleted', `タスク「${task.title}」を削除`);
             updateCollection('tasks', tasks => tasks.filter(t => t.id !== id));
         }
     };
@@ -190,10 +196,16 @@ function TasksContent() {
                                 {task.title}
                             </h4>
                             <p className="task-card-desc">{task.description}</p>
-                            <div className="task-card-meta">
+                            <div className="task-card-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                 {task.dueDate && <span>📅 {task.dueDate}</span>}
+                                {task.businessId && (
+                                    <span>🏢 {db.businesses.find(b => b.id === task.businessId)?.name}</span>
+                                )}
+                                {task.assigneeId && (
+                                    <span>👤 {db.users.find(u => u.id === task.assigneeId)?.name}</span>
+                                )}
                             </div>
-                            <div className="task-card-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                            <div className="task-card-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                                 {task.status !== '進行中' && (
                                     <Button size="sm" variant="primary" onClick={() => changeStatus(task, '進行中')}>進行中</Button>
                                 )}
@@ -202,6 +214,23 @@ function TasksContent() {
                                 )}
                                 {task.status === '完了' && (
                                     <Button size="sm" variant="secondary" onClick={() => changeStatus(task, '未着手')}>戻す</Button>
+                                )}
+                                {task.status === '完了' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => deleteTask(task.id)}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            padding: '4px 8px',
+                                            color: 'var(--danger)',
+                                            fontSize: '16px'
+                                        }}
+                                        title="削除"
+                                    >
+                                        🗑️
+                                    </button>
                                 )}
                                 <Button size="sm" variant="ghost" onClick={() => openDetailModal(task)}>詳細</Button>
                             </div>
@@ -281,6 +310,24 @@ function TasksContent() {
                         <input type="date" name="dueDate" defaultValue={editingTask?.dueDate} />
                     </div>
                     <div className="form-group">
+                        <label>事業</label>
+                        <select name="businessId" defaultValue={editingTask?.businessId || ''}>
+                            <option value="">未設定</option>
+                            {db.businesses.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label>担当者</label>
+                        <select name="assigneeId" defaultValue={editingTask?.assigneeId || ''}>
+                            <option value="">未設定</option>
+                            {db.users.map(u => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group">
                         <label>表示開始日時（この日時まで非表示）</label>
                         <input type="datetime-local" name="showAfter" defaultValue={editingTask?.showAfter} />
                     </div>
@@ -322,6 +369,16 @@ function TasksContent() {
                                     <div>{selectedTask.dueDate}</div>
                                 </div>
                             )}
+
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>事業</label>
+                                <div>{db.businesses.find(b => b.id === selectedTask.businessId)?.name || '未設定'}</div>
+                            </div>
+
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>担当者</label>
+                                <div>{db.users.find(u => u.id === selectedTask.assigneeId)?.name || '未設定'}</div>
+                            </div>
 
                             {selectedTask.description && (
                                 <div>
