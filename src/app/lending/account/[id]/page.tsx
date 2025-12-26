@@ -76,7 +76,7 @@ function AccountDetailContent() {
         setEditModalOpen(false);
     };
 
-    const saveTransfer = (e: React.FormEvent) => {
+    const saveTransfer = async (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -96,13 +96,13 @@ function AccountDetailContent() {
             createdAt: new Date().toISOString()
         };
 
-        updateCollection('accountTransactions', items => [
+        await updateCollection('accountTransactions', items => [
             ...items,
             { id: genId(items), ...newTransaction }
         ]);
 
         // 残高更新（移転元から減算、移転先に加算）
-        updateCollection('accounts', items =>
+        await updateCollection('accounts', items =>
             items.map(a => {
                 if (a.id === accountId) {
                     return { ...a, balance: (a.balance || 0) - amount };
@@ -117,7 +117,7 @@ function AccountDetailContent() {
         setTransferModalOpen(false);
     };
 
-    const saveIncome = (e: React.FormEvent) => {
+    const saveIncome = async (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -127,7 +127,7 @@ function AccountDetailContent() {
         const memo = formData.get('memo') as string;
 
         // AccountTransactionに追加
-        updateCollection('accountTransactions', items => [
+        await updateCollection('accountTransactions', items => [
             ...items,
             {
                 id: genId(items),
@@ -141,13 +141,13 @@ function AccountDetailContent() {
         ]);
 
         // 残高更新
-        updateCollection('accounts', items =>
+        await updateCollection('accounts', items =>
             items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + amount } : a)
         );
 
         // 管理会計（transactions）にも追加
         const categoryName = incomeType === 'interest' ? '受取利息' : '運用益';
-        updateCollection('transactions', items => [
+        await updateCollection('transactions', items => [
             ...items,
             {
                 id: genId(items),
