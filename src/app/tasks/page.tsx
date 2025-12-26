@@ -140,13 +140,27 @@ function TasksContent() {
         setDetailModalOpen(false);
     };
 
-    const deleteTask = (id: number) => {
+    const deleteTask = async (id: number) => {
         const task = db.tasks.find(t => t.id === id);
         if (!task) return;
 
         if (confirm('このタスクを削除しますか？')) {
-            addHistory(id, 'deleted', `タスク「${task.title}」を削除`);
-            updateCollection('tasks', tasks => tasks.filter(t => t.id !== id));
+            // 先に履歴を追加してから削除（Supabaseの外部キー制約対応）
+            await updateCollection('taskHistories', histories => [
+                ...histories,
+                {
+                    id: genId(histories),
+                    taskId: id,
+                    action: 'deleted' as const,
+                    description: `タスク「${task.title}」を削除`,
+                    userId: user?.id || 1,
+                    createdAt: new Date().toISOString()
+                }
+            ]);
+            // 履歴保存を待ってからタスクを削除
+            setTimeout(() => {
+                updateCollection('tasks', tasks => tasks.filter(t => t.id !== id));
+            }, 100);
         }
     };
 
