@@ -136,7 +136,46 @@ function LendingContent() {
             name: formData.get('name') as string,
             color: formData.get('color') as string || undefined
         }]);
-        setModalType(null);
+        form.reset();
+    };
+
+    const deleteTag = (tagId: number) => {
+        const tag = db.tags.find(t => t.id === tagId);
+        if (!tag) return;
+
+        // このタグを使っている口座・相手がないかチェック
+        const usedByAccounts = db.accounts.filter(a => a.tags?.includes(tag.name));
+        const usedByPersons = db.persons.filter(p => p.tags?.includes(tag.name));
+
+        if (usedByAccounts.length > 0 || usedByPersons.length > 0) {
+            if (!confirm(`このタグは ${usedByAccounts.length + usedByPersons.length} 件で使用中です。削除すると関連付けも解除されます。削除しますか？`)) {
+                return;
+            }
+            // 口座からタグを削除
+            if (usedByAccounts.length > 0) {
+                updateCollection('accounts', items =>
+                    items.map(a => ({
+                        ...a,
+                        tags: a.tags?.filter(t => t !== tag.name)
+                    }))
+                );
+            }
+            // 相手からタグを削除
+            if (usedByPersons.length > 0) {
+                updateCollection('persons', items =>
+                    items.map(p => ({
+                        ...p,
+                        tags: p.tags?.filter(t => t !== tag.name)
+                    }))
+                );
+            }
+        } else {
+            if (!confirm(`タグ「${tag.name}」を削除しますか？`)) {
+                return;
+            }
+        }
+
+        updateCollection('tags', items => items.filter(t => t.id !== tagId));
     };
 
     const saveTransfer = (e: React.FormEvent) => {
@@ -495,7 +534,7 @@ function LendingContent() {
             </Modal>
 
             {/* タグモーダル */}
-            <Modal isOpen={modalType === 'tag'} onClose={() => setModalType(null)} title="タグを追加">
+            <Modal isOpen={modalType === 'tag'} onClose={() => setModalType(null)} title="タグ管理">
                 <form onSubmit={saveTag}>
                     <div className="form-group">
                         <label>タグ名</label>
@@ -512,8 +551,34 @@ function LendingContent() {
                         <h5>既存のタグ</h5>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
                             {db.tags.map(tag => (
-                                <span key={tag.id} className="badge" style={{ backgroundColor: tag.color || '#6366f1' }}>
+                                <span
+                                    key={tag.id}
+                                    className="badge"
+                                    style={{
+                                        backgroundColor: tag.color || '#6366f1',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}
+                                >
                                     {tag.name}
+                                    <button
+                                        type="button"
+                                        onClick={() => deleteTag(tag.id)}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            marginLeft: '4px',
+                                            color: 'inherit',
+                                            fontSize: '14px',
+                                            lineHeight: 1
+                                        }}
+                                        title="削除"
+                                    >
+                                        ×
+                                    </button>
                                 </span>
                             ))}
                         </div>
