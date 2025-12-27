@@ -32,6 +32,11 @@ function TasksContent() {
         return true;
     });
 
+    // スタッフは自分のタスクのみ表示
+    if (!user?.isAdmin) {
+        tasks = tasks.filter(t => t.assigneeId === user?.id);
+    }
+
     if (filterStatus) tasks = tasks.filter(t => t.status === filterStatus);
 
     const openModal = (task?: Task) => {

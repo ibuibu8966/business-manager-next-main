@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         id: existingUsers.id, // Integer ID
                         email: sessionUser.email || '',
                         name: existingUsers.name,
-                        isAdmin: existingUsers.isAdmin || true, // 一旦全員管理者権限
+                        isAdmin: existingUsers.is_admin ?? false, // DBのis_adminカラムを参照
                     });
                 } else {
                     // 新規ユーザー作成（usersテーブルに追加）
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         auth_id: sessionUser.id,
                         email: sessionUser.email || '',
                         name: sessionUser.user_metadata?.name || sessionUser.email?.split('@')[0] || 'User',
-                        is_admin: true, // デフォルトで管理者
+                        is_admin: false, // デフォルトはスタッフ
                         password: '', // ダミー（使わないので）
                     };
 
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         id: newUser.id,
                         email: newUser.email,
                         name: newUser.name,
-                        isAdmin: true,
+                        isAdmin: newUser.is_admin ?? false,
                     });
                 }
             } catch (e) {
