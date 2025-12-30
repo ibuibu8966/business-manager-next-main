@@ -763,6 +763,16 @@ select {
     color: var(--info);
 }
 
+.lending-type.transfer {
+    background: rgba(99, 102, 241, 0.2);
+    color: var(--accent-primary);
+}
+
+.lending-type.income {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--warning);
+}
+
 /* ===== Accounts Grid ===== */
 .accounts-grid {
     display: grid;

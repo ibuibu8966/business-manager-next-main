@@ -71,6 +71,38 @@ function LendingContent() {
     const totalLent = activePersons.reduce((s, p) => { const b = getPersonBalance(p.id); return b > 0 ? s + b : s; }, 0);
     const totalBorrowed = activePersons.reduce((s, p) => { const b = getPersonBalance(p.id); return b < 0 ? s + Math.abs(b) : s; }, 0);
 
+    // 統合履歴の作成（貸借 + 口座取引）
+    const combinedHistory = [
+        // 貸借履歴
+        ...lendings.map(l => ({
+            id: `lending-${l.id}`,
+            date: l.date,
+            type: l.type === 'return' ? 'return' : (l.amount > 0 ? 'lend' : 'borrow'),
+            displayType: l.type === 'return' ? '返済' : (l.amount > 0 ? '貸し' : '借り'),
+            amount: l.amount,
+            accountId: l.accountId,
+            counterpartyType: l.counterpartyType,
+            counterpartyId: l.counterpartyId || l.personId,
+            memo: l.memo,
+            returned: l.returned,
+            source: 'lending' as const,
+            originalId: l.id
+        })),
+        // 口座取引履歴（受取利息・運用益・振替）
+        ...(db.accountTransactions || []).map(t => ({
+            id: `transaction-${t.id}`,
+            date: t.date,
+            type: t.type,
+            displayType: t.type === 'transfer' ? '振替' : (t.type === 'interest' ? '受取利息' : (t.amount < 0 ? '運用損' : '運用益')),
+            amount: t.amount,
+            accountId: t.type === 'transfer' ? t.fromAccountId : t.accountId,
+            toAccountId: t.toAccountId,
+            memo: t.memo,
+            source: 'transaction' as const,
+            originalId: t.id
+        }))
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
     const saveLending = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
@@ -100,12 +132,13 @@ function LendingContent() {
         const formData = new FormData(form);
         const businessId = formData.get('businessId') as string;
         const balance = formData.get('balance') as string;
+        const selectedTags = formData.getAll('tags') as string[];
         updateCollection('accounts', items => [...items, {
             id: genId(items),
             name: formData.get('name') as string,
             businessId: businessId ? parseInt(businessId) : undefined,
             balance: balance ? parseInt(balance) : undefined,
-            tags: [],
+            tags: selectedTags,
             isArchived: false
         }]);
         setModalType(null);
@@ -216,16 +249,17 @@ function LendingContent() {
             createdAt: new Date().toISOString()
         }]);
 
-        // 管理会計にも追加（利息 or 運用益）
-        const categoryName = incomeType === 'interest' ? '受取利息' : '運用益';
+        // 管理会計にも追加（利息 or 運用益/運用損）
+        const isLoss = amount < 0;
+        const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
         const account = db.accounts.find(a => a.id === accountId);
         updateCollection('transactions', items => [...items, {
             id: genId(items),
-            type: 'income' as const,
+            type: isLoss ? 'expense' as const : 'income' as const,
             businessId: account?.businessId || 1,
             accountId,
             category: categoryName,
-            amount,
+            amount: Math.abs(amount),
             date,
             memo: memo || `${categoryName}（${account?.name || ''}）`,
             createdAt: new Date().toISOString()
@@ -269,7 +303,7 @@ function LendingContent() {
                         <Button variant="ghost">📦 アーカイブ</Button>
                     </Link>
                     <Button variant="ghost" onClick={() => setModalType('tag')}>🏷️ タグ追加</Button>
-                    <Button variant="ghost" onClick={() => setModalType('transfer')}>🔄 口座移転</Button>
+                    <Button variant="ghost" onClick={() => setModalType('transfer')}>🔄 振替</Button>
                     <Button variant="ghost" onClick={() => setModalType('income')}>💹 利息/運用益</Button>
                     <Button variant="ghost" onClick={() => setModalType('account')}>+ 社内口座</Button>
                     <Button variant="secondary" onClick={() => setModalType('person')}>+ 外部相手</Button>
@@ -390,7 +424,7 @@ function LendingContent() {
             </div>
 
             {/* 履歴 */}
-            <h4 style={{ margin: '24px 0 16px' }}>📋 貸借履歴</h4>
+            <h4 style={{ margin: '24px 0 16px' }}>📋 貸借・取引履歴</h4>
             <div className="filters" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                     <option value="">全て</option>
@@ -399,33 +433,54 @@ function LendingContent() {
                 </select>
             </div>
             <div className="data-table-container">
-                {lendings.length > 0 ? (
+                {combinedHistory.length > 0 ? (
                     <table className="data-table">
-                        <thead><tr><th>日付</th><th>口座</th><th>相手</th><th>種類</th><th>金額</th><th>状態</th><th></th></tr></thead>
+                        <thead><tr><th>日付</th><th>口座</th><th>相手/詳細</th><th>種類</th><th>金額</th><th>状態</th><th></th></tr></thead>
                         <tbody>
-                            {lendings.map(l => {
-                                const account = db.accounts.find(a => a.id === l.accountId);
-                                let counterpartyName = '-';
-                                if (l.counterpartyType === 'account') {
-                                    const acc = db.accounts.find(a => a.id === l.counterpartyId);
-                                    counterpartyName = acc ? `💼 ${acc.name}` : '?';
-                                } else {
-                                    const person = db.persons.find(p => p.id === (l.counterpartyId || l.personId));
-                                    counterpartyName = person?.name || '?';
+                            {combinedHistory.map(item => {
+                                const account = db.accounts.find(a => a.id === item.accountId);
+                                let detailText = '-';
+
+                                if (item.source === 'lending') {
+                                    if (item.counterpartyType === 'account') {
+                                        const acc = db.accounts.find(a => a.id === item.counterpartyId);
+                                        detailText = acc ? `💼 ${acc.name}` : '?';
+                                    } else {
+                                        const person = db.persons.find(p => p.id === item.counterpartyId);
+                                        detailText = person?.name || '?';
+                                    }
+                                } else if (item.type === 'transfer') {
+                                    const toAccount = db.accounts.find(a => a.id === item.toAccountId);
+                                    detailText = `→ ${toAccount?.name || '?'}`;
                                 }
+
+                                const typeClass = item.type === 'return' ? 'return'
+                                    : item.type === 'lend' ? 'lend'
+                                    : item.type === 'borrow' ? 'borrow'
+                                    : item.type === 'transfer' ? 'transfer'
+                                    : 'income';
+
                                 return (
-                                    <tr key={l.id}>
-                                        <td>{l.date}</td>
+                                    <tr key={item.id}>
+                                        <td>{item.date}</td>
                                         <td>{account?.name || '-'}</td>
-                                        <td>{counterpartyName}</td>
-                                        <td><span className={`lending-type ${l.type === 'return' ? 'return' : l.amount > 0 ? 'lend' : 'borrow'}`}>
-                                            {l.type === 'return' ? '返済' : l.amount > 0 ? '貸し' : '借り'}
-                                        </span></td>
-                                        <td className={l.amount >= 0 ? 'amount-positive' : 'amount-negative'}>¥{Math.abs(l.amount).toLocaleString()}</td>
-                                        <td>{l.returned ? <span className="badge badge-done">返済済</span> : <span className="badge badge-pending">未返済</span>}</td>
+                                        <td>{detailText}</td>
+                                        <td><span className={`lending-type ${typeClass}`}>{item.displayType}</span></td>
+                                        <td className={item.amount >= 0 ? 'amount-positive' : 'amount-negative'}>
+                                            ¥{Math.abs(item.amount).toLocaleString()}
+                                        </td>
+                                        <td>
+                                            {item.source === 'lending' ? (
+                                                item.returned ? <span className="badge badge-done">返済済</span> : <span className="badge badge-pending">未返済</span>
+                                            ) : '-'}
+                                        </td>
                                         <td className="actions-cell">
-                                            {!l.returned && l.type !== 'return' && <Button size="sm" variant="success" onClick={() => markAsReturned(l)}>返済</Button>}
-                                            <Button size="sm" variant="danger" onClick={() => deleteLending(l.id)}>削除</Button>
+                                            {item.source === 'lending' && !item.returned && item.type !== 'return' && (
+                                                <Button size="sm" variant="success" onClick={() => markAsReturned(db.lendings.find(l => l.id === item.originalId)!)}>返済</Button>
+                                            )}
+                                            {item.source === 'lending' && (
+                                                <Button size="sm" variant="danger" onClick={() => deleteLending(item.originalId)}>削除</Button>
+                                            )}
                                         </td>
                                     </tr>
                                 );
@@ -433,7 +488,7 @@ function LendingContent() {
                         </tbody>
                     </table>
                 ) : (
-                    <p style={{ color: 'var(--text-muted)', padding: '16px' }}>貸し借りの記録がありません</p>
+                    <p style={{ color: 'var(--text-muted)', padding: '16px' }}>履歴がありません</p>
                 )}
             </div>
 
@@ -506,6 +561,21 @@ function LendingContent() {
                             <option value="">選択なし</option>
                             {db.businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
+                    </div>
+                    <div className="form-group">
+                        <label>タグ（任意）</label>
+                        {db.tags.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                {db.tags.map(tag => (
+                                    <label key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                        <input type="checkbox" name="tags" value={tag.name} />
+                                        <span className="badge" style={{ backgroundColor: tag.color || '#6366f1' }}>{tag.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        ) : (
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>タグがありません。先にタグを追加してください。</p>
+                        )}
                     </div>
                     <Button type="submit" block>追加</Button>
                 </form>
@@ -586,17 +656,17 @@ function LendingContent() {
                 )}
             </Modal>
 
-            {/* 口座移転モーダル */}
-            <Modal isOpen={modalType === 'transfer'} onClose={() => setModalType(null)} title="口座間移転">
+            {/* 振替モーダル */}
+            <Modal isOpen={modalType === 'transfer'} onClose={() => setModalType(null)} title="口座間振替">
                 <form onSubmit={saveTransfer}>
                     <div className="form-group">
-                        <label>移転元口座</label>
+                        <label>振替元口座</label>
                         <select name="fromAccountId" required>
                             {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
                     </div>
                     <div className="form-group">
-                        <label>移転先口座</label>
+                        <label>振替先口座</label>
                         <select name="toAccountId" required>
                             {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
@@ -613,7 +683,7 @@ function LendingContent() {
                         <label>メモ</label>
                         <input type="text" name="memo" />
                     </div>
-                    <Button type="submit" block>移転を記録</Button>
+                    <Button type="submit" block>振替を記録</Button>
                 </form>
             </Modal>
 
@@ -635,7 +705,10 @@ function LendingContent() {
                     </div>
                     <div className="form-group">
                         <label>金額</label>
-                        <input type="number" name="amount" min="1" required />
+                        <input type="number" name="amount" required />
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            ※ 運用損の場合はマイナス値を入力
+                        </p>
                     </div>
                     <div className="form-group">
                         <label>日付</label>

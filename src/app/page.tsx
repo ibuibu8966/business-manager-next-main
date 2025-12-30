@@ -28,6 +28,45 @@ function DashboardContent() {
   const totalIncome = db.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpense = db.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
+  // 貸借情報の計算
+  const activeAccounts = db.accounts.filter(a => !a.isArchived);
+  const activePersons = db.persons.filter(p => !p.isArchived);
+  const totalAccountBalance = activeAccounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+
+  const getPersonBalance = (personId: number) => {
+    return db.lendings
+      .filter(l => (l.counterpartyType === 'person' && l.counterpartyId === personId) || (!l.counterpartyType && l.personId === personId))
+      .reduce((sum, l) => sum + l.amount, 0);
+  };
+
+  const totalLent = activePersons.reduce((s, p) => {
+    const b = getPersonBalance(p.id);
+    return b > 0 ? s + b : s;
+  }, 0);
+
+  const totalBorrowed = activePersons.reduce((s, p) => {
+    const b = getPersonBalance(p.id);
+    return b < 0 ? s + Math.abs(b) : s;
+  }, 0);
+
+  // 統合履歴（貸借 + 口座取引）
+  const recentLendingHistory = [
+    ...db.lendings.map(l => ({
+      id: `lending-${l.id}`,
+      date: l.date,
+      displayType: l.type === 'return' ? '返済' : (l.amount > 0 ? '貸し' : '借り'),
+      amount: l.amount,
+      typeClass: l.type === 'return' ? 'return' : (l.amount > 0 ? 'lend' : 'borrow')
+    })),
+    ...(db.accountTransactions || []).map(t => ({
+      id: `transaction-${t.id}`,
+      date: t.date,
+      displayType: t.type === 'transfer' ? '振替' : (t.type === 'interest' ? '受取利息' : (t.amount < 0 ? '運用損' : '運用益')),
+      amount: t.amount,
+      typeClass: t.type === 'transfer' ? 'transfer' : 'income'
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+
   // 期限超過タスク
   const overdueTasks = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < now);
 
@@ -169,6 +208,18 @@ function DashboardContent() {
             <span className="stat-label">今月の利益</span>
           </div>
         </div>
+
+        <div className="stat-card">
+          <div className="stat-icon">💳</div>
+          <div className="stat-info">
+            <span className="stat-value">¥{totalAccountBalance.toLocaleString()}</span>
+            <span className="stat-label">口座残高合計</span>
+            <div style={{ marginTop: '8px', fontSize: '12px', display: 'flex', gap: '12px' }}>
+              <span style={{ color: 'var(--success)' }}>貸: ¥{totalLent.toLocaleString()}</span>
+              <span style={{ color: 'var(--danger)' }}>借: ¥{totalBorrowed.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="dashboard-sections">
@@ -232,6 +283,27 @@ function DashboardContent() {
             </div>
           </div>
         )}
+
+        {/* 貸借・取引履歴 */}
+        <div className="dashboard-section">
+          <h3>💰 最近の貸借・取引</h3>
+          <div className="list-container">
+            {recentLendingHistory.map(item => (
+              <div key={item.id} className="list-item">
+                <span className={`lending-type ${item.typeClass}`}>
+                  {item.displayType}
+                </span>
+                <span className="list-item-title">
+                  ¥{Math.abs(item.amount).toLocaleString()}
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{item.date}</span>
+              </div>
+            ))}
+            {recentLendingHistory.length === 0 && (
+              <p style={{ color: 'var(--text-muted)' }}>履歴がありません</p>
+            )}
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

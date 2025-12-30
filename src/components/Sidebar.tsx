@@ -9,7 +9,7 @@ const navItems = [
     { path: '/tasks', icon: '✅', label: 'タスク管理' },
     { path: '/tickets', icon: '🎫', label: 'チケット管理' },
     { path: '/customers', icon: '👥', label: '顧客・対応履歴' },
-    { path: '/lending', icon: '💰', label: '貸借管理' },
+    { path: '/lending', icon: '💰', label: '貸借・口座管理' },
     { path: '/accounting', icon: '📈', label: '管理会計' },
     { path: '/businesses', icon: '🏢', label: '事業管理' },
     { path: '/users', icon: '👤', label: 'ユーザー管理', adminOnly: true },

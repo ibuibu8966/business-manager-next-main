@@ -101,7 +101,7 @@ function AccountDetailContent() {
             { id: genId(items), ...newTransaction }
         ]);
 
-        // 残高更新（移転元から減算、移転先に加算）
+        // 残高更新（振替元から減算、振替先に加算）
         await updateCollection('accounts', items =>
             items.map(a => {
                 if (a.id === accountId) {
@@ -145,16 +145,17 @@ function AccountDetailContent() {
             items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + amount } : a)
         );
 
-        // 管理会計（transactions）にも追加
-        const categoryName = incomeType === 'interest' ? '受取利息' : '運用益';
+        // 管理会計（transactions）にも追加（運用損の場合はexpense）
+        const isLoss = amount < 0;
+        const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
         await updateCollection('transactions', items => [
             ...items,
             {
                 id: genId(items),
-                type: 'income' as const,
+                type: isLoss ? 'expense' as const : 'income' as const,
                 businessId: account.businessId || 1,
                 category: categoryName,
-                amount,
+                amount: Math.abs(amount),
                 date,
                 memo: memo || `${categoryName}（${account.name}）`,
                 createdAt: new Date().toISOString()
@@ -203,7 +204,7 @@ function AccountDetailContent() {
 
     const getTransactionTypeLabel = (type: string) => {
         switch (type) {
-            case 'transfer': return '移転';
+            case 'transfer': return '振替';
             case 'interest': return '受取利息';
             case 'investment_gain': return '運用益';
             default: return type;
@@ -283,7 +284,7 @@ function AccountDetailContent() {
 
             {/* 操作ボタン */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                <Button onClick={() => setTransferModalOpen(true)}>💸 口座間移転</Button>
+                <Button onClick={() => setTransferModalOpen(true)}>💸 振替</Button>
                 <Button onClick={() => { setIncomeType('interest'); setIncomeModalOpen(true); }}>💰 受取利息</Button>
                 <Button onClick={() => { setIncomeType('investment_gain'); setIncomeModalOpen(true); }}>📈 運用益</Button>
             </div>
@@ -420,11 +421,11 @@ function AccountDetailContent() {
                 </form>
             </Modal>
 
-            {/* 移転モーダル */}
-            <Modal isOpen={transferModalOpen} onClose={() => setTransferModalOpen(false)} title="口座間移転">
+            {/* 振替モーダル */}
+            <Modal isOpen={transferModalOpen} onClose={() => setTransferModalOpen(false)} title="口座間振替">
                 <form onSubmit={saveTransfer}>
                     <div className="form-group">
-                        <label>移転先口座</label>
+                        <label>振替先口座</label>
                         <select name="toAccountId" required>
                             <option value="">選択してください</option>
                             {otherAccounts.map(a => (
@@ -444,7 +445,7 @@ function AccountDetailContent() {
                         <label>メモ</label>
                         <textarea name="memo" />
                     </div>
-                    <Button type="submit" block>移転実行</Button>
+                    <Button type="submit" block>振替実行</Button>
                 </form>
             </Modal>
 
@@ -457,7 +458,12 @@ function AccountDetailContent() {
                 <form onSubmit={saveIncome}>
                     <div className="form-group">
                         <label>金額</label>
-                        <input name="amount" type="number" min="1" required />
+                        <input name="amount" type="number" required />
+                        {incomeType === 'investment_gain' && (
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                ※ 運用損の場合はマイナス値を入力
+                            </p>
+                        )}
                     </div>
                     <div className="form-group">
                         <label>日付</label>
