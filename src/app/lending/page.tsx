@@ -248,7 +248,8 @@ function LendingContent() {
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
         const incomeType = formData.get('incomeType') as 'interest' | 'investment_gain';
-        const accountId = parseInt(formData.get('accountId') as string);
+        const target = formData.get('target') as string;
+        const [targetType, targetId] = target.split(':');
         const amount = parseInt(formData.get('amount') as string);
         const date = formData.get('date') as string;
         const memo = formData.get('memo') as string;
@@ -257,7 +258,8 @@ function LendingContent() {
         updateCollection('accountTransactions', items => [...items, {
             id: genId(items),
             type: incomeType,
-            accountId,
+            accountId: targetType === 'account' ? parseInt(targetId) : undefined,
+            personId: targetType === 'person' ? parseInt(targetId) : undefined,
             amount,
             date,
             memo,
@@ -267,16 +269,20 @@ function LendingContent() {
         // 管理会計にも追加（利息 or 運用益/運用損）
         const isLoss = amount < 0;
         const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
-        const account = db.accounts.find(a => a.id === accountId);
+        const targetName = targetType === 'account'
+            ? db.accounts.find(a => a.id === parseInt(targetId))?.name
+            : db.persons.find(p => p.id === parseInt(targetId))?.name;
+        const account = targetType === 'account' ? db.accounts.find(a => a.id === parseInt(targetId)) : null;
+
         updateCollection('transactions', items => [...items, {
             id: genId(items),
             type: isLoss ? 'expense' as const : 'income' as const,
             businessId: account?.businessId || 1,
-            accountId,
+            accountId: targetType === 'account' ? parseInt(targetId) : undefined,
             category: categoryName,
             amount: Math.abs(amount),
             date,
-            memo: memo || `${categoryName}（${account?.name || ''}）`,
+            memo: memo || `${categoryName}（${targetName || ''}）`,
             createdAt: new Date().toISOString()
         }]);
 
@@ -769,9 +775,16 @@ function LendingContent() {
                         </select>
                     </div>
                     <div className="form-group">
-                        <label>口座</label>
-                        <select name="accountId" required>
-                            {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        <label>対象</label>
+                        <select name="target" required>
+                            <optgroup label="社内口座">
+                                {activeAccounts.map(a => <option key={`account:${a.id}`} value={`account:${a.id}`}>{a.name}</option>)}
+                            </optgroup>
+                            {activePersons.length > 0 && (
+                                <optgroup label="外部相手">
+                                    {activePersons.map(p => <option key={`person:${p.id}`} value={`person:${p.id}`}>{p.name}</option>)}
+                                </optgroup>
+                            )}
                         </select>
                     </div>
                     <div className="form-group">
