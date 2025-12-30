@@ -15,6 +15,8 @@ function LendingContent() {
     const [modalType, setModalType] = useState<'lending' | 'account' | 'person' | 'tag' | 'transfer' | 'income' | null>(null);
     const [filterStatus, setFilterStatus] = useState('');
     const [filterTag, setFilterTag] = useState('');
+    const [newAccountTags, setNewAccountTags] = useState<string[]>([]);
+    const [newTagInput, setNewTagInput] = useState('');
 
     if (!db) return <div>Loading...</div>;
 
@@ -132,15 +134,28 @@ function LendingContent() {
         const formData = new FormData(form);
         const businessId = formData.get('businessId') as string;
         const balance = formData.get('balance') as string;
-        const selectedTags = formData.getAll('tags') as string[];
+
+        // 新規タグをtagsコレクションに追加
+        newAccountTags.forEach(tagName => {
+            if (!db.tags.some(t => t.name === tagName)) {
+                updateCollection('tags', items => [...items, {
+                    id: genId(items),
+                    name: tagName,
+                    color: '#6366f1'
+                }]);
+            }
+        });
+
         updateCollection('accounts', items => [...items, {
             id: genId(items),
             name: formData.get('name') as string,
             businessId: businessId ? parseInt(businessId) : undefined,
             balance: balance ? parseInt(balance) : undefined,
-            tags: selectedTags,
+            tags: newAccountTags,
             isArchived: false
         }]);
+        setNewAccountTags([]);
+        setNewTagInput('');
         setModalType(null);
     };
 
@@ -545,7 +560,7 @@ function LendingContent() {
             </Modal>
 
             {/* 口座モーダル */}
-            <Modal isOpen={modalType === 'account'} onClose={() => setModalType(null)} title="社内口座を追加">
+            <Modal isOpen={modalType === 'account'} onClose={() => { setModalType(null); setNewAccountTags([]); setNewTagInput(''); }} title="社内口座を追加">
                 <form onSubmit={saveAccount}>
                     <div className="form-group">
                         <label>口座名</label>
@@ -564,17 +579,73 @@ function LendingContent() {
                     </div>
                     <div className="form-group">
                         <label>タグ（任意）</label>
-                        {db.tags.length > 0 ? (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                            <input
+                                type="text"
+                                value={newTagInput}
+                                onChange={e => setNewTagInput(e.target.value)}
+                                placeholder="タグ名を入力"
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        if (newTagInput.trim() && !newAccountTags.includes(newTagInput.trim())) {
+                                            setNewAccountTags([...newAccountTags, newTagInput.trim()]);
+                                            setNewTagInput('');
+                                        }
+                                    }
+                                }}
+                                style={{ flex: 1 }}
+                            />
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => {
+                                    if (newTagInput.trim() && !newAccountTags.includes(newTagInput.trim())) {
+                                        setNewAccountTags([...newAccountTags, newTagInput.trim()]);
+                                        setNewTagInput('');
+                                    }
+                                }}
+                            >
+                                追加
+                            </Button>
+                        </div>
+                        {newAccountTags.length > 0 && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                                {db.tags.map(tag => (
-                                    <label key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                                        <input type="checkbox" name="tags" value={tag.name} />
-                                        <span className="badge" style={{ backgroundColor: tag.color || '#6366f1' }}>{tag.name}</span>
-                                    </label>
+                                {newAccountTags.map(tag => (
+                                    <span
+                                        key={tag}
+                                        className="badge"
+                                        style={{ backgroundColor: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        {tag}
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewAccountTags(newAccountTags.filter(t => t !== tag))}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', fontSize: '14px' }}
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
                                 ))}
                             </div>
-                        ) : (
-                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>タグがありません。先にタグを追加してください。</p>
+                        )}
+                        {db.tags.length > 0 && (
+                            <div style={{ marginTop: '8px' }}>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>既存タグから選択:</p>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {db.tags.filter(t => !newAccountTags.includes(t.name)).map(tag => (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            className="badge"
+                                            style={{ backgroundColor: tag.color || '#6366f1', cursor: 'pointer', border: 'none' }}
+                                            onClick={() => setNewAccountTags([...newAccountTags, tag.name])}
+                                        >
+                                            + {tag.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
                     <Button type="submit" block>追加</Button>
