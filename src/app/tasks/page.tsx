@@ -24,7 +24,10 @@ function TasksContent() {
 
     const now = new Date();
 
-    // showAfterが未来のタスクは非表示
+    // 非表示中タスク（showAfterが未来）
+    const hiddenTasks = db.tasks.filter(t => t.showAfter && new Date(t.showAfter) > now);
+
+    // 表示中タスク
     let tasks = db.tasks.filter(t => {
         if (t.showAfter) {
             return new Date(t.showAfter) <= now;
@@ -37,7 +40,12 @@ function TasksContent() {
         tasks = tasks.filter(t => t.assigneeId === user?.id);
     }
 
-    if (filterStatus) tasks = tasks.filter(t => t.status === filterStatus);
+    // フィルター適用
+    if (filterStatus === 'hidden') {
+        tasks = hiddenTasks;
+    } else if (filterStatus) {
+        tasks = tasks.filter(t => t.status === filterStatus);
+    }
 
     const openModal = (task?: Task) => {
         setEditingTask(task || null);
@@ -145,6 +153,43 @@ function TasksContent() {
         setDetailModalOpen(false);
     };
 
+    // 明日まで非表示
+    const hideUntilTomorrow = (task: Task) => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        const datetime = tomorrow.toISOString().slice(0, 16);
+        updateCollection('tasks', tasks =>
+            tasks.map(t => t.id === task.id ? { ...t, showAfter: datetime } : t)
+        );
+        addHistory(task.id, 'reminder', '明日まで非表示に設定');
+    };
+
+    // 来週まで非表示
+    const hideUntilNextWeek = (task: Task) => {
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        nextWeek.setHours(9, 0, 0, 0);
+        const datetime = nextWeek.toISOString().slice(0, 16);
+        updateCollection('tasks', tasks =>
+            tasks.map(t => t.id === task.id ? { ...t, showAfter: datetime } : t)
+        );
+        addHistory(task.id, 'reminder', '来週まで非表示に設定');
+    };
+
+    // タスクカードからメモを追加
+    const addMemoToTask = (taskId: number, memo: string) => {
+        addHistory(taskId, 'memo', memo);
+    };
+
+    // 非表示を解除して今すぐ表示
+    const showNow = (task: Task) => {
+        updateCollection('tasks', tasks =>
+            tasks.map(t => t.id === task.id ? { ...t, showAfter: undefined } : t)
+        );
+        addHistory(task.id, 'reminder', '非表示を解除');
+    };
+
     const deleteTask = async (id: number) => {
         const task = db.tasks.find(t => t.id === id);
         if (!task) return;
@@ -192,6 +237,7 @@ function TasksContent() {
                         <option value="未着手">未着手</option>
                         <option value="進行中">進行中</option>
                         <option value="完了">完了</option>
+                        <option value="hidden">非表示中 ({hiddenTasks.length})</option>
                     </select>
                     <Button variant="secondary" onClick={() => setViewMode(viewMode === 'card' ? 'table' : 'card')}>
                         {viewMode === 'card' ? '📋' : '📇'}
@@ -208,26 +254,18 @@ function TasksContent() {
                             className={`task-card priority-${task.priority} status-${task.status} ${isOverdue(task) ? 'overdue' : ''}`}
                             style={isOverdue(task) ? { borderColor: 'var(--danger)', borderWidth: '2px' } : {}}
                         >
-                            <div className="task-card-header">
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', justifyContent: 'flex-start' }}>
                                 <span className={`badge badge-${task.status === '完了' ? 'done' : task.status === '進行中' ? 'active' : 'pending'}`}>
                                     {task.status}
                                 </span>
                                 {isOverdue(task) && <span className="badge" style={{ background: 'var(--danger)', color: 'white' }}>⚠️ 期限超過</span>}
-                            </div>
-                            <h4 className="task-card-title" onClick={() => openDetailModal(task)} style={{ cursor: 'pointer' }}>
-                                {task.title}
-                            </h4>
-                            <p className="task-card-desc">{task.description}</p>
-                            <div className="task-card-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                {task.dueDate && <span>📅 {task.dueDate}</span>}
-                                {task.businessId && (
-                                    <span>🏢 {db.businesses.find(b => b.id === task.businessId)?.name}</span>
-                                )}
-                                {task.assigneeId && (
-                                    <span>👤 {db.users.find(u => u.id === task.assigneeId)?.name}</span>
+                                {task.showAfter && new Date(task.showAfter) > now && (
+                                    <span className="badge" style={{ background: 'var(--warning)', color: 'black', fontSize: '11px' }}>
+                                        ⏰ {new Date(task.showAfter).toLocaleDateString('ja-JP')}まで
+                                    </span>
                                 )}
                             </div>
-                            <div className="task-card-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div className="task-card-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px', maxWidth: '100%' }}>
                                 {task.status !== '進行中' && (
                                     <Button size="sm" variant="primary" onClick={() => changeStatus(task, '進行中')}>進行中</Button>
                                 )}
@@ -254,7 +292,50 @@ function TasksContent() {
                                         🗑️
                                     </button>
                                 )}
+                                {task.showAfter && new Date(task.showAfter) > now ? (
+                                    <Button size="sm" variant="secondary" onClick={() => showNow(task)}>今すぐ表示</Button>
+                                ) : (
+                                    <>
+                                        <Button size="sm" variant="ghost" onClick={() => hideUntilTomorrow(task)}>明日</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => hideUntilNextWeek(task)}>来週</Button>
+                                    </>
+                                )}
                                 <Button size="sm" variant="ghost" onClick={() => openDetailModal(task)}>詳細</Button>
+                            </div>
+                            <h4 className="task-card-title" onClick={() => openDetailModal(task)} style={{ cursor: 'pointer' }}>
+                                {task.title}
+                            </h4>
+                            <p className="task-card-desc">{task.description}</p>
+                            <div className="task-card-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {task.dueDate && <span>📅 {task.dueDate}</span>}
+                                {task.businessId && (
+                                    <span>🏢 {db.businesses.find(b => b.id === task.businessId)?.name}</span>
+                                )}
+                                {task.assigneeId && (
+                                    <span>👤 {db.users.find(u => u.id === task.assigneeId)?.name}</span>
+                                )}
+                            </div>
+                            {/* メモ入力 */}
+                            <div className="task-card-memo" style={{ marginTop: '8px' }}>
+                                <input
+                                    type="text"
+                                    placeholder="メモを追加... (Enter で送信)"
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                            addMemoToTask(task.id, e.currentTarget.value.trim());
+                                            e.currentTarget.value = '';
+                                        }
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '6px 8px',
+                                        fontSize: '12px',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '4px',
+                                        background: 'var(--bg-tertiary)',
+                                        color: 'var(--text-primary)'
+                                    }}
+                                />
                             </div>
                         </div>
                     ))}
