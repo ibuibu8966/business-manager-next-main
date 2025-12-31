@@ -72,21 +72,96 @@ function NewLendingContent() {
 
     return (
         <AppLayout title="貸し借り記録">
-            <div className="page-header">
+            <style jsx>{`
+                .mobile-form-container {
+                    max-width: 600px;
+                    padding: 0 16px;
+                }
+                .mobile-header {
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .mobile-header h3 {
+                    font-size: 18px;
+                    margin: 0;
+                }
+                .quick-buttons {
+                    display: flex;
+                    gap: 12px;
+                    margin-bottom: 24px;
+                    flex-wrap: wrap;
+                }
+                .form-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 16px;
+                }
+                .form-actions {
+                    display: flex;
+                    gap: 12px;
+                    margin-top: 24px;
+                }
+                .inline-form {
+                    background: var(--bg-tertiary);
+                    padding: 16px;
+                    border-radius: 8px;
+                    margin-bottom: 24px;
+                }
+                .inline-form-buttons {
+                    display: flex;
+                    gap: 8px;
+                }
+                @media (max-width: 600px) {
+                    .mobile-form-container {
+                        padding: 0 8px;
+                    }
+                    .mobile-header {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 8px;
+                    }
+                    .mobile-header h3 {
+                        font-size: 16px;
+                    }
+                    .quick-buttons {
+                        flex-direction: column;
+                        gap: 8px;
+                    }
+                    .quick-buttons button {
+                        width: 100%;
+                    }
+                    .form-row {
+                        grid-template-columns: 1fr;
+                        gap: 0;
+                    }
+                    .form-actions {
+                        flex-direction: column;
+                    }
+                    .form-actions button {
+                        width: 100%;
+                    }
+                    .inline-form {
+                        padding: 12px;
+                    }
+                    .inline-form-buttons {
+                        flex-direction: column;
+                    }
+                    .inline-form-buttons button {
+                        width: 100%;
+                    }
+                }
+            `}</style>
+
+            <div className="page-header mobile-header">
                 <h3>貸し借りを記録</h3>
                 <Button variant="ghost" onClick={() => router.push('/lending')}>← 戻る</Button>
             </div>
 
-            <div style={{ maxWidth: '600px' }}>
+            <div className="mobile-form-container">
                 {/* 口座がない場合の警告 */}
                 {!hasAccounts && (
-                    <div style={{
-                        background: 'var(--bg-tertiary)',
-                        padding: '16px',
-                        borderRadius: '8px',
-                        marginBottom: '24px',
-                        border: '1px solid var(--border)'
-                    }}>
+                    <div className="inline-form" style={{ border: '1px solid var(--border)' }}>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
                             まず社内口座を追加してください
                         </p>
@@ -95,7 +170,7 @@ function NewLendingContent() {
                 )}
 
                 {/* クイック追加ボタン */}
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+                <div className="quick-buttons">
                     <Button variant="ghost" onClick={() => setShowAccountForm(!showAccountForm)}>
                         + 社内口座を追加
                     </Button>
@@ -106,19 +181,14 @@ function NewLendingContent() {
 
                 {/* 口座追加フォーム */}
                 {showAccountForm && (
-                    <div style={{
-                        background: 'var(--bg-tertiary)',
-                        padding: '16px',
-                        borderRadius: '8px',
-                        marginBottom: '24px'
-                    }}>
+                    <div className="inline-form">
                         <h4 style={{ marginBottom: '12px' }}>社内口座を追加</h4>
                         <form onSubmit={saveAccount}>
                             <div className="form-group">
                                 <label>口座名</label>
                                 <input name="name" placeholder="例: 会社口座、現金、社長個人" required />
                             </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div className="inline-form-buttons">
                                 <Button type="submit" size="sm">追加</Button>
                                 <Button type="button" size="sm" variant="ghost" onClick={() => setShowAccountForm(false)}>キャンセル</Button>
                             </div>
@@ -128,12 +198,7 @@ function NewLendingContent() {
 
                 {/* 相手追加フォーム */}
                 {showPersonForm && (
-                    <div style={{
-                        background: 'var(--bg-tertiary)',
-                        padding: '16px',
-                        borderRadius: '8px',
-                        marginBottom: '24px'
-                    }}>
+                    <div className="inline-form">
                         <h4 style={{ marginBottom: '12px' }}>外部相手を追加</h4>
                         <form onSubmit={savePerson}>
                             <div className="form-group">
@@ -144,7 +209,7 @@ function NewLendingContent() {
                                 <label>メモ</label>
                                 <input name="memo" placeholder="連絡先など" />
                             </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div className="inline-form-buttons">
                                 <Button type="submit" size="sm">追加</Button>
                                 <Button type="button" size="sm" variant="ghost" onClick={() => setShowPersonForm(false)}>キャンセル</Button>
                             </div>
@@ -156,45 +221,51 @@ function NewLendingContent() {
                 {hasAccounts && (
                     <div className="form-container">
                         <form onSubmit={saveLending}>
-                            <div className="form-group">
-                                <label>この口座から</label>
-                                <select name="accountId" required>
-                                    {db.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>相手</label>
-                                <select name="counterparty" required>
-                                    <optgroup label="社内口座">
-                                        {db.accounts.map(a => <option key={`account:${a.id}`} value={`account:${a.id}`}>{a.name}</option>)}
-                                    </optgroup>
-                                    {db.persons.length > 0 && (
-                                        <optgroup label="外部相手">
-                                            {db.persons.map(p => <option key={`person:${p.id}`} value={`person:${p.id}`}>{p.name}</option>)}
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>この口座から</label>
+                                    <select name="accountId" required>
+                                        {db.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>相手</label>
+                                    <select name="counterparty" required>
+                                        <optgroup label="社内口座">
+                                            {db.accounts.map(a => <option key={`account:${a.id}`} value={`account:${a.id}`}>{a.name}</option>)}
                                         </optgroup>
-                                    )}
-                                </select>
+                                        {db.persons.length > 0 && (
+                                            <optgroup label="外部相手">
+                                                {db.persons.map(p => <option key={`person:${p.id}`} value={`person:${p.id}`}>{p.name}</option>)}
+                                            </optgroup>
+                                        )}
+                                    </select>
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label>種類</label>
-                                <select name="type" required>
-                                    <option value="lend">貸す（相手に渡す）</option>
-                                    <option value="borrow">借りる（相手から受け取る）</option>
-                                </select>
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>種類</label>
+                                    <select name="type" required>
+                                        <option value="lend">貸す（相手に渡す）</option>
+                                        <option value="borrow">借りる（相手から受け取る）</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>金額</label>
+                                    <input type="number" name="amount" min="1" placeholder="10000" required />
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label>金額</label>
-                                <input type="number" name="amount" min="1" placeholder="10000" required />
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>日付</label>
+                                    <input type="date" name="date" defaultValue={new Date().toISOString().split('T')[0]} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>メモ</label>
+                                    <input type="text" name="memo" placeholder="例: 立替分、飲み会代" />
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label>日付</label>
-                                <input type="date" name="date" defaultValue={new Date().toISOString().split('T')[0]} required />
-                            </div>
-                            <div className="form-group">
-                                <label>メモ</label>
-                                <input type="text" name="memo" placeholder="例: 立替分、飲み会代" />
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                            <div className="form-actions">
                                 <Button type="submit" disabled={isSubmitting}>
                                     {isSubmitting ? '保存中...' : '記録する'}
                                 </Button>
