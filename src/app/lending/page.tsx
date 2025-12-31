@@ -266,25 +266,24 @@ function LendingContent() {
             createdAt: new Date().toISOString()
         }]);
 
-        // 管理会計にも追加（利息 or 運用益/運用損）
-        const isLoss = amount < 0;
-        const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
-        const targetName = targetType === 'account'
-            ? db.accounts.find(a => a.id === parseInt(targetId))?.name
-            : db.persons.find(p => p.id === parseInt(targetId))?.name;
-        const account = targetType === 'account' ? db.accounts.find(a => a.id === parseInt(targetId)) : null;
+        // 管理会計にも追加（自社口座の場合のみ）
+        if (targetType === 'account') {
+            const isLoss = amount < 0;
+            const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
+            const account = db.accounts.find(a => a.id === parseInt(targetId));
 
-        updateCollection('transactions', items => [...items, {
-            id: genId(items),
-            type: isLoss ? 'expense' as const : 'income' as const,
-            businessId: account?.businessId || 1,
-            accountId: targetType === 'account' ? parseInt(targetId) : undefined,
-            category: categoryName,
-            amount: Math.abs(amount),
-            date,
-            memo: memo || `${categoryName}（${targetName || ''}）`,
-            createdAt: new Date().toISOString()
-        }]);
+            updateCollection('transactions', items => [...items, {
+                id: genId(items),
+                type: isLoss ? 'expense' as const : 'income' as const,
+                businessId: account?.businessId || 1,
+                accountId: parseInt(targetId),
+                category: categoryName,
+                amount: Math.abs(amount),
+                date,
+                memo: memo || `${categoryName}（${account?.name || ''}）`,
+                createdAt: new Date().toISOString()
+            }]);
+        }
 
         setModalType(null);
     };

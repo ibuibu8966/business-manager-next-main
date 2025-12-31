@@ -19,6 +19,13 @@ const DEFAULT_CATEGORIES: Category[] = [
     { id: 12, type: 'income', name: '運用益' },
 ];
 
+const DEFAULT_TICKET_SOURCES = [
+    { id: 1, name: '電話', key: 'phone' },
+    { id: 2, name: 'メール', key: 'email' },
+    { id: 3, name: 'Web', key: 'web' },
+    { id: 4, name: 'その他', key: 'other' },
+];
+
 const DEFAULT_DB: Database = {
     users: [{ id: 1, name: '管理者', email: 'admin@example.com', isAdmin: true }],
     businesses: [],
@@ -38,6 +45,8 @@ const DEFAULT_DB: Database = {
     notifications: [],
     accountTransactions: [],
     tags: [],
+    ticketSources: DEFAULT_TICKET_SOURCES,
+    ticketHistories: [],
 };
 
 // LocalStorageからロード

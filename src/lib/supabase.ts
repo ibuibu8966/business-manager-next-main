@@ -40,6 +40,8 @@ export const tableNames = {
   notifications: 'notifications',
   accountTransactions: 'account_transactions',
   tags: 'tags',
+  ticketSources: 'ticket_sources',
+  ticketHistories: 'ticket_histories',
 } as const;
 
 // カラム名変換（camelCase → snake_case）

@@ -16,6 +16,8 @@ function AccountingContent() {
     const [filterBusiness, setFilterBusiness] = useState('');
     const [filterAccount, setFilterAccount] = useState('');
     const [selectedBusinessId, setSelectedBusinessId] = useState<number | null>(null);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryType, setNewCategoryType] = useState<'income' | 'expense'>('expense');
 
     useEffect(() => {
         if (db) processFixedCosts();
@@ -87,10 +89,10 @@ function AccountingContent() {
     if (filterBusiness) txns = txns.filter(t => t.businessId === parseInt(filterBusiness));
     if (filterAccount) txns = txns.filter(t => t.accountId === parseInt(filterAccount));
 
-    // 選択中の事業に紐づく口座
-    const filteredAccounts = selectedBusinessId
-        ? db.accounts.filter(a => a.businessId === selectedBusinessId)
-        : db.accounts;
+    // 選択中の事業に紐づく口座（アーカイブ済みを除外）
+    const filteredAccounts = db.accounts.filter(a =>
+        !a.isArchived && (!selectedBusinessId || a.businessId === selectedBusinessId)
+    );
 
     const saveTransaction = (e: React.FormEvent, type: 'income' | 'expense') => {
         e.preventDefault();
@@ -142,6 +144,22 @@ function AccountingContent() {
     const deleteFixedCost = (id: number) => {
         if (confirm('削除しますか？')) {
             updateCollection('fixedCosts', costs => costs.filter(c => c.id !== id));
+        }
+    };
+
+    const saveCategory = () => {
+        if (!newCategoryName.trim()) return;
+        updateCollection('categories', cats => [...cats, {
+            id: genId(cats),
+            type: newCategoryType,
+            name: newCategoryName.trim()
+        }]);
+        setNewCategoryName('');
+    };
+
+    const deleteCategory = (id: number) => {
+        if (confirm('このカテゴリを削除しますか？')) {
+            updateCollection('categories', cats => cats.filter(c => c.id !== id));
         }
     };
 
@@ -378,6 +396,51 @@ function AccountingContent() {
                     </div>
                     <Button type="submit" block>保存</Button>
                 </form>
+            </Modal>
+
+            {/* カテゴリ管理モーダル */}
+            <Modal isOpen={modalType === 'category'} onClose={() => setModalType(null)} title="カテゴリ管理">
+                <div style={{ marginBottom: '16px' }}>
+                    <h5>新規カテゴリ追加</h5>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <select value={newCategoryType} onChange={e => setNewCategoryType(e.target.value as 'income' | 'expense')}>
+                            <option value="income">収入</option>
+                            <option value="expense">支出</option>
+                        </select>
+                        <input
+                            type="text"
+                            value={newCategoryName}
+                            onChange={e => setNewCategoryName(e.target.value)}
+                            placeholder="カテゴリ名"
+                            style={{ flex: 1 }}
+                        />
+                        <Button onClick={saveCategory}>追加</Button>
+                    </div>
+                </div>
+
+                <div>
+                    <h5>収入カテゴリ</h5>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                        {db.categories.filter(c => c.type === 'income').map(cat => (
+                            <span key={cat.id} className="badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {cat.name}
+                                <button onClick={() => deleteCategory(cat.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>×</button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                    <h5>支出カテゴリ</h5>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                        {db.categories.filter(c => c.type === 'expense').map(cat => (
+                            <span key={cat.id} className="badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {cat.name}
+                                <button onClick={() => deleteCategory(cat.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>×</button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
             </Modal>
         </AppLayout>
     );

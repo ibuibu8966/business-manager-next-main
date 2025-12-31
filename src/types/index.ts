@@ -42,8 +42,25 @@ export interface Ticket {
     description?: string;
     customerId?: number;
     assignedUserId?: number;
-    source: 'phone' | 'email' | 'web' | 'other';
+    source: string;  // カスタム経路対応
     status: '新規' | '対応中' | '保留' | '完了';
+    createdAt: string;
+}
+
+// チケット経路マスタ
+export interface TicketSource {
+    id: number;
+    name: string;
+    key: string;
+}
+
+// チケット履歴
+export interface TicketHistory {
+    id: number;
+    ticketId: number;
+    action: 'created' | 'status' | 'comment' | 'memo' | 'updated';
+    description: string;
+    userId: number;
     createdAt: string;
 }
 
@@ -197,5 +214,7 @@ export interface Database {
     notifications: Notification[];
     accountTransactions: AccountTransaction[];
     tags: Tag[];
+    ticketSources: TicketSource[];
+    ticketHistories: TicketHistory[];
 }
 
