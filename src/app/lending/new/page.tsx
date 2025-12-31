@@ -78,9 +78,12 @@ function NewLendingContent() {
                     padding: 0 16px;
                 }
                 .mobile-header {
+                    display: flex;
                     flex-direction: row;
                     align-items: center;
+                    justify-content: space-between;
                     gap: 12px;
+                    margin-bottom: 16px;
                 }
                 .mobile-header h3 {
                     font-size: 18px;
@@ -114,15 +117,13 @@ function NewLendingContent() {
                 }
                 @media (max-width: 600px) {
                     .mobile-form-container {
-                        padding: 0 8px;
+                        padding: 0;
                     }
                     .mobile-header {
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 8px;
+                        margin-bottom: 12px;
                     }
                     .mobile-header h3 {
-                        font-size: 16px;
+                        display: none;
                     }
                     .quick-buttons {
                         flex-direction: column;
@@ -153,7 +154,7 @@ function NewLendingContent() {
                 }
             `}</style>
 
-            <div className="page-header mobile-header">
+            <div className="mobile-header">
                 <h3>貸し借りを記録</h3>
                 <Button variant="ghost" onClick={() => router.push('/lending')}>← 戻る</Button>
             </div>
