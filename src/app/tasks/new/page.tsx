@@ -26,11 +26,13 @@ function NewTaskContent() {
 
         const taskData = {
             title: formData.get('title') as string,
-            description: formData.get('description') as string,
+            description: (formData.get('description') as string) || undefined,
             status: formData.get('status') as Task['status'],
             priority: formData.get('priority') as Task['priority'],
-            dueDate: formData.get('dueDate') as string,
-            showAfter: formData.get('showAfter') as string || undefined,
+            dueDate: (formData.get('dueDate') as string) || undefined,
+            showAfter: (formData.get('showAfter') as string) || undefined,
+            businessId: formData.get('businessId') ? Number(formData.get('businessId')) : undefined,
+            assigneeId: formData.get('assigneeId') ? Number(formData.get('assigneeId')) : undefined,
             userId: user?.id || 1,
         };
 
@@ -86,6 +88,9 @@ function NewTaskContent() {
                     margin-top: 24px;
                 }
                 @media (max-width: 600px) {
+                    :global(#main-header) {
+                        display: none;
+                    }
                     .mobile-form-container {
                         padding: 0;
                     }
@@ -149,6 +154,26 @@ function NewTaskContent() {
                         <div className="form-group">
                             <label>表示開始日時</label>
                             <input type="datetime-local" name="showAfter" />
+                        </div>
+                    </div>
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>事業</label>
+                            <select name="businessId" defaultValue="">
+                                <option value="">未設定</option>
+                                {db.businesses.map(b => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>担当者</label>
+                            <select name="assigneeId" defaultValue="">
+                                <option value="">未設定</option>
+                                {db.users.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
                     <div className="form-actions">
