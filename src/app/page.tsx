@@ -39,15 +39,6 @@ function DashboardContent() {
       .reduce((sum, l) => sum + l.amount, 0);
   };
 
-  const getAccountBalance = (accountId: number) => {
-    let balance = 0;
-    db.lendings.forEach(l => {
-      if (l.accountId === accountId) balance -= l.amount;
-      if (l.counterpartyType === 'account' && l.counterpartyId === accountId) balance += l.amount;
-    });
-    return balance;
-  };
-
   const totalLent = activePersons.reduce((s, p) => {
     const b = getPersonBalance(p.id);
     return b > 0 ? s + b : s;
@@ -230,57 +221,6 @@ function DashboardContent() {
           </div>
         </div>
       </div>
-
-      {/* 社内口座カード */}
-      {activeAccounts.length > 0 && (
-        <div className="dashboard-section" style={{ marginBottom: '24px' }}>
-          <h3>🏦 社内口座</h3>
-          <div className="accounts-grid">
-            {activeAccounts.map(account => {
-              const balance = account.balance || 0;
-              const lendBorrow = getAccountBalance(account.id);
-              return (
-                <Link href={`/lending/account/${account.id}`} key={account.id} style={{ textDecoration: 'none' }}>
-                  <div className="account-card-mini">
-                    <div className="account-name">{account.name}</div>
-                    <div className="account-balance-large">¥{balance.toLocaleString()}</div>
-                    <div className="account-lend-borrow">
-                      貸借: <span className={lendBorrow >= 0 ? 'positive' : 'negative'}>
-                        {lendBorrow >= 0 ? '+' : ''}¥{lendBorrow.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 外部相手カード */}
-      {activePersons.length > 0 && (
-        <div className="dashboard-section" style={{ marginBottom: '24px' }}>
-          <h3>👥 外部相手</h3>
-          <div className="persons-grid">
-            {activePersons.map(person => {
-              const balance = getPersonBalance(person.id);
-              return (
-                <Link href={`/lending/person/${person.id}`} key={person.id} style={{ textDecoration: 'none' }}>
-                  <div className="person-card-mini">
-                    <div className="person-name">{person.name}</div>
-                    <div className={`person-balance-large ${balance > 0 ? 'positive' : balance < 0 ? 'negative' : ''}`}>
-                      ¥{Math.abs(balance).toLocaleString()}
-                    </div>
-                    <div className={`person-status ${balance > 0 ? 'lend' : balance < 0 ? 'borrow' : 'zero'}`}>
-                      {balance > 0 ? '貸し' : balance < 0 ? '借り' : '精算済'}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="dashboard-sections">
         <div className="dashboard-section">
