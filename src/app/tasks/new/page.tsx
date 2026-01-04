@@ -77,6 +77,9 @@ function NewTaskContent() {
                     font-size: 18px;
                     margin: 0;
                 }
+                .user-header {
+                    display: none;
+                }
                 .form-row {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
@@ -90,6 +93,25 @@ function NewTaskContent() {
                 @media (max-width: 600px) {
                     :global(#main-header) {
                         display: none;
+                    }
+                    .user-header {
+                        display: flex;
+                        align-items: center;
+                        justify-content: flex-end;
+                        gap: 8px;
+                        padding: 12px 0;
+                        margin-bottom: 8px;
+                        border-bottom: 1px solid var(--border-color);
+                    }
+                    .user-header .user-name {
+                        font-weight: 600;
+                    }
+                    .user-header .user-badge {
+                        background: var(--danger);
+                        color: white;
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                        font-size: 12px;
                     }
                     .mobile-form-container {
                         padding: 0;
@@ -112,6 +134,11 @@ function NewTaskContent() {
                     }
                 }
             `}</style>
+
+            <div className="user-header">
+                <span className="user-name">{user?.name}</span>
+                {user?.isAdmin && <span className="user-badge">管理者</span>}
+            </div>
 
             <div className="mobile-header">
                 <h3>新規タスク作成</h3>
