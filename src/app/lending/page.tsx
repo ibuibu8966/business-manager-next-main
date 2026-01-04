@@ -378,7 +378,7 @@ function LendingContent() {
                             <div className="account-card" style={{ cursor: 'pointer' }}>
                                 <div className="account-name">{account.name}</div>
                                 {account.balance !== undefined && (
-                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                    <div style={{ fontSize: '28px', fontWeight: 700 }}>
                                         残高: ¥{account.balance.toLocaleString()}
                                     </div>
                                 )}

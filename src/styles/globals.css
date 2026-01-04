@@ -718,7 +718,7 @@ select {
 }
 
 .person-balance {
-    font-size: 20px;
+    font-size: 12px;
     font-weight: 700;
 }
 
@@ -735,7 +735,8 @@ select {
 }
 
 .person-meta {
-    font-size: 12px;
+    font-size: 20px;
+    font-weight: 700;
     color: var(--text-muted);
 }
 
@@ -803,7 +804,7 @@ select {
 }
 
 .account-balance {
-    font-size: 28px;
+    font-size: 12px;
     font-weight: 700;
 }
 
