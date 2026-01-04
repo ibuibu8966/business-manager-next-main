@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 function NewLendingContent() {
     const router = useRouter();
     const { db, updateCollection } = useDatabase();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!db) return <div>Loading...</div>;
@@ -91,6 +91,9 @@ function NewLendingContent() {
                     :global(#main-header) {
                         display: none;
                     }
+                    :global(.sidebar-footer) {
+                        display: none;
+                    }
                     .user-header {
                         display: flex;
                         align-items: center;
@@ -109,6 +112,14 @@ function NewLendingContent() {
                         padding: 2px 8px;
                         border-radius: 4px;
                         font-size: 12px;
+                    }
+                    .user-header .logout-btn {
+                        background: none;
+                        border: none;
+                        color: var(--text-secondary);
+                        cursor: pointer;
+                        font-size: 14px;
+                        padding: 4px 8px;
                     }
                     .mobile-form-container {
                         padding: 0;
@@ -135,6 +146,7 @@ function NewLendingContent() {
             <div className="user-header">
                 <span className="user-name">{user?.name}</span>
                 {user?.isAdmin && <span className="user-badge">管理者</span>}
+                <button className="logout-btn" onClick={logout}>ログアウト</button>
             </div>
 
             <div className="mobile-header">
