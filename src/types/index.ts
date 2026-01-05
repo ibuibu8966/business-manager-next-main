@@ -121,7 +121,7 @@ export interface Lending {
 export interface Transaction {
     id: number;
     type: 'income' | 'expense';
-    businessId: number;
+    businessId?: number;
     accountId?: number;
     category: string;
     amount: number;

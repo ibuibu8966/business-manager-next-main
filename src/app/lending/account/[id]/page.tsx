@@ -158,7 +158,7 @@ function AccountDetailContent() {
             {
                 id: genId(items),
                 type: isLoss ? 'expense' as const : 'income' as const,
-                businessId: account.businessId || 1,
+                businessId: account.businessId,
                 category: categoryName,
                 amount: Math.abs(amount),
                 date,
