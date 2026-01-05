@@ -48,37 +48,18 @@ function PersonDetailContent() {
         (l.counterpartyType === 'person' && l.counterpartyId === personId)
     );
 
-    // 貸借合計計算
-    // 旧形式（personIdのみ）と新形式（counterpartyType使用）で視点が異なる
-    // 旧形式: type は外部相手視点 → borrow = 相手が借りた = ユーザーが貸した
-    // 新形式: type はユーザー視点 → lend = ユーザーが貸した
-    const lendingTotal = relatedLendings
-        .filter(l => {
-            if (!l.returned) {
-                if (l.counterpartyType) {
-                    // 新形式: lend = ユーザーが貸している
-                    return l.type === 'lend';
-                } else {
-                    // 旧形式: borrow = 外部相手が借りた = ユーザーが貸している
-                    return l.type === 'borrow';
-                }
-            }
-            return false;
-        })
+    // 貸借合計計算（外部相手視点で表示）
+    // 外部相手の「貸出中」= ユーザーが借りた金額（type: 'borrow'）
+    // 外部相手の「借入中」= ユーザーが貸した金額（type: 'lend'）
+
+    // 外部相手の貸出中 = ユーザーが借りている金額
+    const personLendingTotal = relatedLendings
+        .filter(l => l.type === 'borrow' && !l.returned)
         .reduce((sum, l) => sum + Math.abs(l.amount), 0);
-    const borrowingTotal = relatedLendings
-        .filter(l => {
-            if (!l.returned) {
-                if (l.counterpartyType) {
-                    // 新形式: borrow = ユーザーが借りている
-                    return l.type === 'borrow';
-                } else {
-                    // 旧形式: lend = 外部相手が貸した = ユーザーが借りている
-                    return l.type === 'lend';
-                }
-            }
-            return false;
-        })
+
+    // 外部相手の借入中 = ユーザーが貸している金額
+    const personBorrowingTotal = relatedLendings
+        .filter(l => l.type === 'lend' && !l.returned)
         .reduce((sum, l) => sum + Math.abs(l.amount), 0);
 
     // 純入出金取引
@@ -91,8 +72,8 @@ function PersonDetailContent() {
         return sum + (t.type === 'deposit' ? t.amount : -t.amount);
     }, 0);
 
-    // 純資産 = 貸出中（資産） - 借入中（負債） + 純入出金累計
-    const netWorth = lendingTotal - borrowingTotal + netFlowTotal;
+    // 純資産（外部相手視点）= 貸出中（資産） - 借入中（負債） + 純入出金累計
+    const netWorth = personLendingTotal - personBorrowingTotal + netFlowTotal;
 
     const savePersonInfo = (e: React.FormEvent) => {
         e.preventDefault();
@@ -225,13 +206,13 @@ function PersonDetailContent() {
                     <div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>貸出中（資産）</div>
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success)' }}>
-                            ¥{lendingTotal.toLocaleString()}
+                            ¥{personLendingTotal.toLocaleString()}
                         </div>
                     </div>
                     <div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>借入中（負債）</div>
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger)' }}>
-                            ¥{borrowingTotal.toLocaleString()}
+                            ¥{personBorrowingTotal.toLocaleString()}
                         </div>
                     </div>
                     <div>
@@ -239,9 +220,9 @@ function PersonDetailContent() {
                         <div style={{
                             fontSize: '1.5rem',
                             fontWeight: 'bold',
-                            color: lendingTotal - borrowingTotal >= 0 ? 'var(--success)' : 'var(--danger)'
+                            color: personLendingTotal - personBorrowingTotal >= 0 ? 'var(--success)' : 'var(--danger)'
                         }}>
-                            ¥{(lendingTotal - borrowingTotal).toLocaleString()}
+                            ¥{(personLendingTotal - personBorrowingTotal).toLocaleString()}
                         </div>
                     </div>
                     <div>
@@ -378,10 +359,10 @@ function PersonDetailContent() {
                                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                     .map(l => {
                                         const account = db.accounts.find(a => a.id === l.accountId);
-                                        // 旧形式と新形式で視点が異なるため、ユーザー視点に変換
-                                        const isLendingFromUser = l.counterpartyType
-                                            ? l.type === 'lend'  // 新形式: lend = ユーザーが貸している
-                                            : l.type === 'borrow'; // 旧形式: borrow = 相手が借りた = ユーザーが貸している
+                                        // 外部相手視点で表示
+                                        // type='borrow'（ユーザーが借りた）= 外部相手が貸した = 貸出
+                                        // type='lend'（ユーザーが貸した）= 外部相手が借りた = 借入
+                                        const isLendingFromPerson = l.type === 'borrow';
                                         return (
                                             <tr key={l.id}>
                                                 <td>{l.date}</td>
@@ -391,8 +372,8 @@ function PersonDetailContent() {
                                                     </Link>
                                                 </td>
                                                 <td>
-                                                    <span className={`badge ${isLendingFromUser ? 'badge-success' : 'badge-danger'}`}>
-                                                        {isLendingFromUser ? '貸出' : '借入'}
+                                                    <span className={`badge ${isLendingFromPerson ? 'badge-success' : 'badge-danger'}`}>
+                                                        {isLendingFromPerson ? '貸出' : '借入'}
                                                     </span>
                                                 </td>
                                                 <td>¥{Math.abs(l.amount).toLocaleString()}</td>
