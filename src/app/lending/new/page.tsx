@@ -173,7 +173,7 @@ function NewLendingContent() {
                         <form onSubmit={saveLending}>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>この口座から</label>
+                                    <label>対象口座</label>
                                     <select name="accountId" required>
                                         {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>

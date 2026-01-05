@@ -198,6 +198,19 @@ export interface AccountTransaction {
     createdAt: string;
 }
 
+// 外部相手取引（純入出金）
+export interface PersonTransaction {
+    id: number;
+    type: 'deposit' | 'withdrawal';
+    // deposit = 外部相手にお金が入る（あなたが渡す）→ あなたの純資産減少
+    // withdrawal = 外部相手からお金が出る（あなたが受け取る）→ あなたの純資産増加
+    personId: number;
+    amount: number;        // 常に正の値
+    date: string;
+    memo?: string;
+    createdAt: string;
+}
+
 // タグマスタ
 export interface Tag {
     id: number;
@@ -274,6 +287,7 @@ export interface Database {
     taskHistories: TaskHistory[];
     notifications: Notification[];
     accountTransactions: AccountTransaction[];
+    personTransactions: PersonTransaction[];
     tags: Tag[];
     ticketSources: TicketSource[];
     ticketHistories: TicketHistory[];

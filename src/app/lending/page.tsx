@@ -98,7 +98,11 @@ function LendingContent() {
             id: `transaction-${t.id}`,
             date: t.date,
             type: t.type,
-            displayType: t.type === 'transfer' ? '振替' : (t.type === 'interest' ? '受取利息' : (t.amount < 0 ? '運用損' : '運用益')),
+            displayType: t.type === 'transfer' ? '振替'
+                : t.type === 'interest' ? '受取利息'
+                : t.type === 'deposit' ? '純入金'
+                : t.type === 'withdrawal' ? '純出金'
+                : (t.amount < 0 ? '運用損' : '運用益'),
             amount: t.amount,
             accountId: t.type === 'transfer' ? t.fromAccountId : t.accountId,
             toAccountId: t.toAccountId,
@@ -331,6 +335,12 @@ function LendingContent() {
         }
     };
 
+    const deleteAccountTransaction = (id: number) => {
+        if (confirm('削除しますか？')) {
+            updateCollection('accountTransactions', items => items.filter(t => t.id !== id));
+        }
+    };
+
     return (
         <AppLayout title="貸借管理">
             <div className="page-header">
@@ -519,6 +529,9 @@ function LendingContent() {
                                             {item.source === 'lending' && (
                                                 <Button size="sm" variant="danger" onClick={() => deleteLending(item.originalId)}>削除</Button>
                                             )}
+                                            {item.source === 'transaction' && (
+                                                <Button size="sm" variant="danger" onClick={() => deleteAccountTransaction(item.originalId)}>削除</Button>
+                                            )}
                                         </td>
                                     </tr>
                                 );
@@ -540,7 +553,7 @@ function LendingContent() {
                 ) : (
                     <form onSubmit={saveLending}>
                         <div className="form-group">
-                            <label>この口座から</label>
+                            <label>対象口座</label>
                             <select name="accountId" required>
                                 {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </select>

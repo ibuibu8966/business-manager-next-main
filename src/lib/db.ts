@@ -44,6 +44,7 @@ const DEFAULT_DB: Database = {
     taskHistories: [],
     notifications: [],
     accountTransactions: [],
+    personTransactions: [],
     tags: [],
     ticketSources: DEFAULT_TICKET_SOURCES,
     ticketHistories: [],

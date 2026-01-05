@@ -39,6 +39,7 @@ export const tableNames = {
   taskHistories: 'task_histories',
   notifications: 'notifications',
   accountTransactions: 'account_transactions',
+  personTransactions: 'person_transactions',
   tags: 'tags',
   ticketSources: 'ticket_sources',
   ticketHistories: 'ticket_histories',

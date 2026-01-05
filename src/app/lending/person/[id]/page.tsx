@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
-import { useDatabase } from '@/lib/db';
+import { useDatabase, genId } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 
@@ -18,6 +18,8 @@ function PersonDetailContent() {
 
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [tagModalOpen, setTagModalOpen] = useState(false);
+    const [netFlowModalOpen, setNetFlowModalOpen] = useState(false);
+    const [netFlowType, setNetFlowType] = useState<'deposit' | 'withdrawal'>('deposit');
     const [newTag, setNewTag] = useState('');
 
     if (!db) return <div>Loading...</div>;
@@ -49,7 +51,20 @@ function PersonDetailContent() {
         .reduce((sum, l) => sum + l.amount, 0);
     const borrowingTotal = relatedLendings
         .filter(l => l.type === 'borrow' && !l.returned)
-        .reduce((sum, l) => sum + l.amount, 0);
+        .reduce((sum, l) => sum + Math.abs(l.amount), 0);
+
+    // 純入出金取引
+    const personTransactions = (db.personTransactions || []).filter(t => t.personId === personId);
+
+    // 純入出金累計（あなた視点）
+    // deposit = 相手にお金を渡す → あなたの純資産減少（マイナス）
+    // withdrawal = 相手からお金をもらう → あなたの純資産増加（プラス）
+    const netFlowTotal = personTransactions.reduce((sum, t) => {
+        return sum + (t.type === 'withdrawal' ? t.amount : -t.amount);
+    }, 0);
+
+    // 純資産 = 貸出中（資産） - 借入中（負債） + 純入出金累計
+    const netWorth = lendingTotal - borrowingTotal + netFlowTotal;
 
     const savePersonInfo = (e: React.FormEvent) => {
         e.preventDefault();
@@ -104,6 +119,32 @@ function PersonDetailContent() {
         }
     };
 
+    const saveNetFlow = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const formData = new FormData(form);
+
+        await updateCollection('personTransactions', items => [
+            ...items,
+            {
+                id: genId(items),
+                type: netFlowType,
+                personId,
+                amount: Number(formData.get('amount')),
+                date: formData.get('date') as string,
+                memo: formData.get('memo') as string,
+                createdAt: new Date().toISOString()
+            }
+        ]);
+        setNetFlowModalOpen(false);
+    };
+
+    const deletePersonTransaction = (id: number) => {
+        if (confirm('削除しますか？')) {
+            updateCollection('personTransactions', items => items.filter(t => t.id !== id));
+        }
+    };
+
     const markAsReturned = (lendingId: number) => {
         if (confirm('この貸借を返済済みにしますか？')) {
             updateCollection('lendings', items =>
@@ -135,15 +176,15 @@ function PersonDetailContent() {
 
             {/* 相手情報 */}
             <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                     <div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>貸出中</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>貸出中（資産）</div>
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success)' }}>
                             ¥{lendingTotal.toLocaleString()}
                         </div>
                     </div>
                     <div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>借入中</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>借入中（負債）</div>
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger)' }}>
                             ¥{borrowingTotal.toLocaleString()}
                         </div>
@@ -156,6 +197,26 @@ function PersonDetailContent() {
                             color: lendingTotal - borrowingTotal >= 0 ? 'var(--success)' : 'var(--danger)'
                         }}>
                             ¥{(lendingTotal - borrowingTotal).toLocaleString()}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>純入出金累計</div>
+                        <div style={{
+                            fontSize: '1.5rem',
+                            fontWeight: 'bold',
+                            color: netFlowTotal >= 0 ? 'var(--success)' : 'var(--danger)'
+                        }}>
+                            ¥{netFlowTotal.toLocaleString()}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>純資産</div>
+                        <div style={{
+                            fontSize: '1.5rem',
+                            fontWeight: 'bold',
+                            color: netWorth >= 0 ? 'var(--primary)' : 'var(--danger)'
+                        }}>
+                            ¥{netWorth.toLocaleString()}
                         </div>
                     </div>
                     <div>
@@ -190,7 +251,56 @@ function PersonDetailContent() {
                         <Button size="sm" variant="secondary" onClick={() => setTagModalOpen(true)}>+ タグ追加</Button>
                     </div>
                 </div>
+
+                {/* 操作ボタン */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                    <Button onClick={() => { setNetFlowType('deposit'); setNetFlowModalOpen(true); }}>💵 純入金</Button>
+                    <Button variant="secondary" onClick={() => { setNetFlowType('withdrawal'); setNetFlowModalOpen(true); }}>💵 純出金</Button>
+                </div>
             </div>
+
+            {/* 純入出金履歴 */}
+            {personTransactions.length > 0 && (
+                <div className="card" style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h4>純入出金履歴</h4>
+                    </div>
+                    <div className="data-table-container">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>日付</th>
+                                    <th>種類</th>
+                                    <th>金額</th>
+                                    <th>メモ</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {personTransactions
+                                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                    .map(t => (
+                                        <tr key={t.id}>
+                                            <td>{t.date}</td>
+                                            <td>
+                                                <span className={`badge ${t.type === 'withdrawal' ? 'badge-success' : 'badge-danger'}`}>
+                                                    {t.type === 'withdrawal' ? '純出金' : '純入金'}
+                                                </span>
+                                            </td>
+                                            <td style={{ color: t.type === 'withdrawal' ? 'var(--success)' : 'var(--danger)' }}>
+                                                {t.type === 'withdrawal' ? '+' : '-'}¥{t.amount.toLocaleString()}
+                                            </td>
+                                            <td>{t.memo || '-'}</td>
+                                            <td>
+                                                <Button size="sm" variant="danger" onClick={() => deletePersonTransaction(t.id)}>削除</Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* 貸借履歴 */}
             <div className="card">
@@ -321,6 +431,31 @@ function PersonDetailContent() {
                         ))}
                     </div>
                 </div>
+            </Modal>
+
+            {/* 純入出金モーダル */}
+            <Modal
+                isOpen={netFlowModalOpen}
+                onClose={() => setNetFlowModalOpen(false)}
+                title={netFlowType === 'deposit' ? '純入金（相手に渡す）' : '純出金（相手から受取）'}
+            >
+                <form onSubmit={saveNetFlow}>
+                    <div className="form-group">
+                        <label>金額</label>
+                        <input type="number" name="amount" min="1" required placeholder="金額を入力" />
+                    </div>
+                    <div className="form-group">
+                        <label>日付</label>
+                        <input type="date" name="date" defaultValue={new Date().toISOString().split('T')[0]} required />
+                    </div>
+                    <div className="form-group">
+                        <label>メモ</label>
+                        <input name="memo" placeholder="メモ（任意）" />
+                    </div>
+                    <Button type="submit" block>
+                        {netFlowType === 'deposit' ? '純入金を記録' : '純出金を記録'}
+                    </Button>
+                </form>
             </Modal>
         </AppLayout>
     );

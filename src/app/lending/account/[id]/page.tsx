@@ -60,7 +60,10 @@ function AccountDetailContent() {
         .reduce((sum, l) => sum + l.amount, 0);
     const borrowingTotal = relatedLendings
         .filter(l => l.type === 'borrow' && !l.returned)
-        .reduce((sum, l) => sum + l.amount, 0);
+        .reduce((sum, l) => sum + Math.abs(l.amount), 0);
+
+    // 純資産 = 残高 + 貸出中（資産） - 借入中（負債）
+    const netWorth = (account.balance || 0) + lendingTotal - borrowingTotal;
 
     const saveAccountInfo = (e: React.FormEvent) => {
         e.preventDefault();
@@ -292,6 +295,12 @@ function AccountDetailContent() {
                         </div>
                     </div>
                     <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>純資産</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: netWorth >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            ¥{netWorth.toLocaleString()}
+                        </div>
+                    </div>
+                    <div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>事業</div>
                         <div>{business?.name || '未設定'}</div>
                     </div>
@@ -417,14 +426,37 @@ function AccountDetailContent() {
                                 {relatedLendings
                                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                     .map(l => {
-                                        const person = db.persons.find(p => p.id === l.personId);
+                                        // 相手の取得ロジック（counterpartyType対応）
+                                        const getCounterparty = () => {
+                                            if (l.counterpartyType === 'person') {
+                                                const person = db.persons.find(p => p.id === l.counterpartyId);
+                                                return { type: 'person', name: person?.name, id: l.counterpartyId };
+                                            } else if (l.counterpartyType === 'account') {
+                                                const account = db.accounts.find(a => a.id === l.counterpartyId);
+                                                return { type: 'account', name: account?.name, id: l.counterpartyId };
+                                            } else if (l.personId) {
+                                                // 旧形式（後方互換）
+                                                const person = db.persons.find(p => p.id === l.personId);
+                                                return { type: 'person', name: person?.name, id: l.personId };
+                                            }
+                                            return { type: 'unknown', name: '不明', id: null };
+                                        };
+                                        const counterparty = getCounterparty();
                                         return (
                                             <tr key={l.id}>
                                                 <td>{l.date}</td>
                                                 <td>
-                                                    <Link href={`/lending/person/${l.personId}`} style={{ color: 'var(--primary)' }}>
-                                                        {person?.name || '不明'}
-                                                    </Link>
+                                                    {counterparty.type === 'account' ? (
+                                                        <Link href={`/lending/account/${counterparty.id}`} style={{ color: 'var(--primary)' }}>
+                                                            💼 {counterparty.name || '不明'}
+                                                        </Link>
+                                                    ) : counterparty.type === 'person' ? (
+                                                        <Link href={`/lending/person/${counterparty.id}`} style={{ color: 'var(--primary)' }}>
+                                                            {counterparty.name || '不明'}
+                                                        </Link>
+                                                    ) : (
+                                                        '不明'
+                                                    )}
                                                 </td>
                                                 <td>
                                                     <span className={`badge ${l.type === 'lend' ? 'badge-success' : 'badge-danger'}`}>
