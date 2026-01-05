@@ -394,13 +394,13 @@ function TicketsContent() {
                         {/* コメント入力 */}
                         <div style={{ marginBottom: '16px' }}>
                             <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>対応コメント</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    type="text"
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                                <textarea
                                     value={newComment}
                                     onChange={e => setNewComment(e.target.value)}
                                     placeholder="コメントを入力..."
-                                    style={{ flex: 1, padding: '8px', border: '1px solid var(--border-color)', borderRadius: '4px' }}
+                                    rows={3}
+                                    style={{ flex: 1, padding: '8px', border: '1px solid var(--border-color)', borderRadius: '4px', resize: 'vertical' }}
                                 />
                                 <Button onClick={addComment}>送信</Button>
                             </div>
