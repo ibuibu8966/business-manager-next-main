@@ -1234,17 +1234,10 @@ select {
 }
 
 .task-card-actions {
-    position: absolute;
-    top: 12px;
-    right: 12px;
     display: flex;
     gap: 8px;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-}
-
-.task-card:hover .task-card-actions {
-    opacity: 1;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
 }
 
 .task-card.status-完了 {
@@ -1267,6 +1260,118 @@ select {
 
 .task-card.priority-low {
     border-left: 4px solid var(--success);
+}
+
+/* Task Card - Latest Memo & Creator */
+.task-card-latest-memo {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.task-card-latest-memo .memo-author {
+    color: var(--text-muted);
+}
+
+.task-card-latest-memo .memo-text {
+    margin-left: 4px;
+    color: var(--text-secondary);
+}
+
+.task-card-creator {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* ===== Task Table Grid (Card Grid View) ===== */
+.task-table-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 1400px) {
+    .task-table-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .task-table-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .task-table-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .task-table-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.task-table-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: all var(--transition-fast);
+}
+
+.task-table-card:hover {
+    border-color: var(--accent-primary);
+}
+
+.task-table-card.overdue {
+    border-color: var(--danger);
+    border-width: 2px;
+}
+
+.task-table-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+.task-table-card-title:hover {
+    color: var(--accent-primary);
+}
+
+.task-table-card-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-table-card-status .overdue-icon {
+    color: var(--danger);
+}
+
+.task-table-card-date {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.task-table-card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: auto;
 }
 
 /* ===== Scrollbar ===== */

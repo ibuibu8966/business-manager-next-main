@@ -17,6 +17,7 @@ function TasksContent() {
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [filterStatus, setFilterStatus] = useState('');
+    const [filterAssignee, setFilterAssignee] = useState<number | ''>('');
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
     const [newMemo, setNewMemo] = useState('');
 
@@ -45,6 +46,14 @@ function TasksContent() {
         tasks = hiddenTasks;
     } else if (filterStatus) {
         tasks = tasks.filter(t => t.status === filterStatus);
+    } else {
+        // 「全て」選択時は完了を除外
+        tasks = tasks.filter(t => t.status !== '完了');
+    }
+
+    // 担当者フィルター適用
+    if (filterAssignee) {
+        tasks = tasks.filter(t => t.assigneeId === filterAssignee);
     }
 
     const openModal = (task?: Task) => {
@@ -221,6 +230,14 @@ function TasksContent() {
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     };
 
+    // 最新メモを取得
+    const getLatestMemo = (taskId: number): TaskHistory | null => {
+        const memos = db.taskHistories
+            .filter(h => h.taskId === taskId && h.action === 'memo')
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return memos.length > 0 ? memos[0] : null;
+    };
+
     // 期限超過チェック
     const isOverdue = (task: Task) => {
         if (!task.dueDate || task.status === '完了') return false;
@@ -239,6 +256,15 @@ function TasksContent() {
                         <option value="完了">完了</option>
                         <option value="hidden">非表示中 ({hiddenTasks.length})</option>
                     </select>
+                    {user?.isAdmin && (
+                        <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value ? Number(e.target.value) : '')}>
+                            <option value="">全担当者</option>
+                            {user && <option value={user.id}>{user.name} (自分)</option>}
+                            {db.users.filter(u => u.id !== user?.id).map(u => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                        </select>
+                    )}
                     <Button variant="secondary" onClick={() => setViewMode(viewMode === 'card' ? 'table' : 'card')}>
                         {viewMode === 'card' ? '📋' : '📇'}
                     </Button>
@@ -315,6 +341,18 @@ function TasksContent() {
                                     <span>👤 {db.users.find(u => u.id === task.assigneeId)?.name}</span>
                                 )}
                             </div>
+                            {/* 最新メモ表示 */}
+                            {(() => {
+                                const latestMemo = getLatestMemo(task.id);
+                                if (!latestMemo) return null;
+                                const memoUser = db.users.find(u => u.id === latestMemo.userId);
+                                return (
+                                    <div className="task-card-latest-memo">
+                                        <span className="memo-author">{memoUser?.name || '?'}:</span>
+                                        <span className="memo-text">{latestMemo.description}</span>
+                                    </div>
+                                );
+                            })()}
                             {/* メモ入力 */}
                             <div className="task-card-memo" style={{ marginTop: '8px' }}>
                                 <input
@@ -337,6 +375,10 @@ function TasksContent() {
                                     }}
                                 />
                             </div>
+                            {/* 作成者表示 */}
+                            <div className="task-card-creator">
+                                {db.users.find(u => u.id === task.userId)?.name || '?'}が追加
+                            </div>
                         </div>
                     ))}
                     {tasks.length === 0 && (
@@ -347,37 +389,35 @@ function TasksContent() {
                     )}
                 </div>
             ) : (
-                <div className="data-table-container">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>タイトル</th>
-                                <th>ステータス</th>
-                                <th>期限</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {tasks.map(task => (
-                                <tr key={task.id} style={isOverdue(task) ? { background: 'rgba(239, 68, 68, 0.1)' } : {}}>
-                                    <td onClick={() => openDetailModal(task)} style={{ cursor: 'pointer' }}>{task.title}</td>
-                                    <td>
-                                        <span className={`badge badge-${task.status === '完了' ? 'done' : 'pending'}`}>
-                                            {task.status}
-                                        </span>
-                                        {isOverdue(task) && <span style={{ color: 'var(--danger)', marginLeft: '8px' }}>⚠️</span>}
-                                    </td>
-                                    <td>{task.dueDate || '-'}</td>
-                                    <td className="actions-cell">
-                                        {task.status !== '完了' && (
-                                            <Button size="sm" variant="success" onClick={() => changeStatus(task, '完了')}>完了</Button>
-                                        )}
-                                        <Button size="sm" variant="secondary" onClick={() => openDetailModal(task)}>詳細</Button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="task-table-grid">
+                    {tasks.map(task => (
+                        <div key={task.id} className={`task-table-card ${isOverdue(task) ? 'overdue' : ''}`}>
+                            <h4 className="task-table-card-title" onClick={() => openDetailModal(task)}>
+                                {task.title}
+                            </h4>
+                            <div className="task-table-card-status">
+                                <span className={`badge badge-${task.status === '完了' ? 'done' : task.status === '進行中' ? 'active' : 'pending'}`}>
+                                    {task.status}
+                                </span>
+                                {isOverdue(task) && <span className="overdue-icon">⚠️</span>}
+                            </div>
+                            <div className="task-table-card-date">
+                                📅 {task.dueDate || '-'}
+                            </div>
+                            <div className="task-table-card-actions">
+                                {task.status !== '完了' && (
+                                    <Button size="sm" variant="success" onClick={() => changeStatus(task, '完了')}>完了</Button>
+                                )}
+                                <Button size="sm" variant="secondary" onClick={() => openDetailModal(task)}>詳細</Button>
+                            </div>
+                        </div>
+                    ))}
+                    {tasks.length === 0 && (
+                        <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
+                            <div className="empty-state-icon">✅</div>
+                            <div className="empty-state-text">タスクがありません</div>
+                        </div>
+                    )}
                 </div>
             )}
 
