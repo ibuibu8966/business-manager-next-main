@@ -33,7 +33,18 @@ export interface Customer {
     phone?: string;
     email?: string;
     address?: string;
-    memo?: string;
+    memo?: string;  // 旧フィールド（移行用に残す）
+    // 新規追加フィールド
+    tags?: string[];
+    discordName?: string;
+    lineName?: string;
+    paypalId?: string;
+    univapayId?: string;
+    memberpayId?: string;
+    note?: string;  // 備考（決済免除などの特記）
+    isArchived?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface Ticket {
@@ -194,6 +205,56 @@ export interface Tag {
     color?: string;
 }
 
+// 顧客履歴（メモ等）
+export interface CustomerHistory {
+    id: number;
+    customerId: number;
+    action: 'created' | 'updated' | 'memo' | 'tag_added' | 'tag_removed';
+    description: string;
+    userId: number;
+    createdAt: string;
+}
+
+// サロン
+export interface Salon {
+    id: number;
+    name: string;
+}
+
+// コース
+export interface Course {
+    id: number;
+    salonId: number;
+    name: string;
+    discordRoleName?: string;  // 付与するDiscordロール名
+    price?: number;
+}
+
+// 顧客の加入情報
+export interface Subscription {
+    id: number;
+    customerId: number;
+    courseId: number;
+    paymentService: 'paypal' | 'univapay' | 'memberpay';
+    isExempt: boolean;        // 決済免除フラグ
+    isActive: boolean;        // アクティブ/退会
+    withdrawnAt?: string;     // 退会日
+    createdAt: string;
+}
+
+// 月次チェック
+export interface MonthlyCheck {
+    id: number;
+    yearMonth: string;        // '2025-01'
+    customerId: number;
+    courseId: number;
+    subscriptionId: number;
+    paymentConfirmed: boolean;  // ✓決済確認
+    roleGranted: boolean;       // ✓ロール付与
+    createdAt: string;
+    updatedAt?: string;
+}
+
 // Database interface
 export interface Database {
     users: User[];
@@ -216,5 +277,11 @@ export interface Database {
     tags: Tag[];
     ticketSources: TicketSource[];
     ticketHistories: TicketHistory[];
+    // 新規追加
+    customerHistories: CustomerHistory[];
+    salons: Salon[];
+    courses: Course[];
+    subscriptions: Subscription[];
+    monthlyChecks: MonthlyCheck[];
 }
 

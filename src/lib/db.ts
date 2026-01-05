@@ -47,6 +47,12 @@ const DEFAULT_DB: Database = {
     tags: [],
     ticketSources: DEFAULT_TICKET_SOURCES,
     ticketHistories: [],
+    // 新規追加
+    customerHistories: [],
+    salons: [],
+    courses: [],
+    subscriptions: [],
+    monthlyChecks: [],
 };
 
 // LocalStorageからロード

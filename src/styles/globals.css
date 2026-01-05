@@ -896,8 +896,13 @@ select {
     animation: modalIn 0.3s ease;
 }
 
-.modal-large {
+.modal-large,
+.modal-lg {
     max-width: 800px;
+}
+
+.modal-sm {
+    max-width: 400px;
 }
 
 @keyframes modalIn {

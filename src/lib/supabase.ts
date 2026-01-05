@@ -42,6 +42,12 @@ export const tableNames = {
   tags: 'tags',
   ticketSources: 'ticket_sources',
   ticketHistories: 'ticket_histories',
+  // 新規追加
+  customerHistories: 'customer_histories',
+  salons: 'salons',
+  courses: 'courses',
+  subscriptions: 'subscriptions',
+  monthlyChecks: 'monthly_checks',
 } as const;
 
 // カラム名変換（camelCase → snake_case）
