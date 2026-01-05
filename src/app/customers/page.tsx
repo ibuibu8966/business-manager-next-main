@@ -309,28 +309,30 @@ function CustomersContent() {
 
     // 決済確認モード
     const startMonthlyCheck = () => {
+        if (!confirm(`${selectedYearMonth}のチェックを開始しますか？\n既存のチェック履歴がある場合は削除されます。`)) {
+            return;
+        }
+
         const activeSubscriptions = (db.subscriptions || []).filter(s => s.isActive);
-        const existingChecks = (db.monthlyChecks || []).filter(m => m.yearMonth === selectedYearMonth);
 
-        let addedCount = 0;
-        activeSubscriptions.forEach(sub => {
-            const exists = existingChecks.some(m => m.subscriptionId === sub.id);
-            if (!exists) {
-                updateCollection('monthlyChecks', items => [...items, {
-                    id: genId(items),
-                    yearMonth: selectedYearMonth,
-                    customerId: sub.customerId,
-                    courseId: sub.courseId,
-                    subscriptionId: sub.id,
-                    paymentConfirmed: false,
-                    roleGranted: false,
-                    createdAt: new Date().toISOString()
-                }]);
-                addedCount++;
-            }
-        });
+        // 既存のチェックを削除
+        updateCollection('monthlyChecks', items => items.filter(m => m.yearMonth !== selectedYearMonth));
 
-        alert(`${selectedYearMonth}のチェックを開始しました。${addedCount}件のチェック項目を追加しました。`);
+        // 新規チェック項目を作成
+        const newChecks = activeSubscriptions.map((sub, index) => ({
+            id: genId(db.monthlyChecks || []) + index,
+            yearMonth: selectedYearMonth,
+            customerId: sub.customerId,
+            courseId: sub.courseId,
+            subscriptionId: sub.id,
+            paymentConfirmed: false,
+            roleGranted: false,
+            createdAt: new Date().toISOString()
+        }));
+
+        updateCollection('monthlyChecks', items => [...items.filter(m => m.yearMonth !== selectedYearMonth), ...newChecks]);
+
+        alert(`${selectedYearMonth}のチェックを開始しました。${newChecks.length}件のチェック項目を作成しました。`);
     };
 
     const togglePaymentConfirmed = (checkId: number) => {
@@ -456,18 +458,42 @@ function CustomersContent() {
         }
     };
 
-    // 年月選択肢の生成
-    const generateYearMonthOptions = () => {
-        const options = [];
-        const now = new Date();
-        for (let i = -12; i <= 3; i++) {
-            const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-            const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            const label = `${date.getFullYear()}年${date.getMonth() + 1}月`;
-            options.push({ value, label });
-        }
-        return options;
+    // 過去のチェック履歴から年月を取得
+    const getExistingYearMonths = () => {
+        const yearMonths = new Set((db.monthlyChecks || []).map(m => m.yearMonth));
+        return Array.from(yearMonths).sort().reverse();
     };
+
+    // サマリー計算（サロン/コース別の決済状況）
+    const calculateSummary = () => {
+        const summary: Record<string, { salonName: string; courseName: string; total: number; confirmed: number }> = {};
+
+        monthlyChecks.forEach(check => {
+            const course = getCourse(check.courseId);
+            if (!course) return;
+            const salon = getSalon(course.salonId);
+            const key = `${salon?.id || 0}-${course.id}`;
+
+            if (!summary[key]) {
+                summary[key] = {
+                    salonName: salon?.name || '不明',
+                    courseName: course.name,
+                    total: 0,
+                    confirmed: 0
+                };
+            }
+            summary[key].total++;
+            if (check.paymentConfirmed) {
+                summary[key].confirmed++;
+            }
+        });
+
+        return Object.values(summary).sort((a, b) =>
+            a.salonName.localeCompare(b.salonName) || a.courseName.localeCompare(b.courseName)
+        );
+    };
+
+    const summaryData = calculateSummary();
 
     return (
         <AppLayout title="顧客管理">
@@ -642,16 +668,32 @@ function CustomersContent() {
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <label>対象月:</label>
-                                <select
+                                <input
+                                    type="month"
                                     value={selectedYearMonth}
                                     onChange={e => setSelectedYearMonth(e.target.value)}
                                     style={{ padding: '0.5rem' }}
-                                >
-                                    {generateYearMonthOptions().map(opt => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
+                                />
                             </div>
+                            {getExistingYearMonths().length > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <label>過去履歴:</label>
+                                    <select
+                                        value=""
+                                        onChange={e => {
+                                            if (e.target.value) setSelectedYearMonth(e.target.value);
+                                        }}
+                                        style={{ padding: '0.5rem' }}
+                                    >
+                                        <option value="">選択...</option>
+                                        {getExistingYearMonths().map(ym => (
+                                            <option key={ym} value={ym}>
+                                                {ym.replace('-', '年')}月
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <Button onClick={startMonthlyCheck}>
                                 {selectedYearMonth.split('-')[1]}月のチェックを開始
                             </Button>
@@ -731,6 +773,43 @@ function CustomersContent() {
                                 }} />
                             </div>
                         </div>
+
+                        {/* サマリー（サロン/コース別決済状況） */}
+                        {summaryData.length > 0 && (
+                            <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '14px' }}>サロン/コース別 決済状況</h4>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                                    {summaryData.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            style={{
+                                                padding: '0.5rem 1rem',
+                                                backgroundColor: 'var(--bg-primary)',
+                                                borderRadius: '6px',
+                                                border: '1px solid var(--border-color)',
+                                                minWidth: '150px'
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.salonName}</div>
+                                            <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{item.courseName}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <span style={{
+                                                    fontSize: '18px',
+                                                    fontWeight: 'bold',
+                                                    color: item.confirmed === item.total ? 'var(--success)' : 'var(--text-primary)'
+                                                }}>
+                                                    {item.confirmed}/{item.total}
+                                                </span>
+                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>件決済</span>
+                                                {item.confirmed === item.total && (
+                                                    <span style={{ fontSize: '12px', color: 'var(--success)' }}>✓</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* チェックリスト（アコーディオン形式） */}
