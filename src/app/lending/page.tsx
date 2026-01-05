@@ -18,6 +18,8 @@ function LendingContent() {
     const [filterTag, setFilterTag] = useState('');
     const [newAccountTags, setNewAccountTags] = useState<string[]>([]);
     const [newTagInput, setNewTagInput] = useState('');
+    const [newPersonTags, setNewPersonTags] = useState<string[]>([]);
+    const [newPersonTagInput, setNewPersonTagInput] = useState('');
 
     if (!db) return <div>Loading...</div>;
 
@@ -165,14 +167,28 @@ function LendingContent() {
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
         const businessId = formData.get('businessId') as string;
+
+        // 新規タグをtagsコレクションに追加
+        newPersonTags.forEach(tagName => {
+            if (!db.tags.some(t => t.name === tagName)) {
+                updateCollection('tags', items => [...items, {
+                    id: genId(items),
+                    name: tagName,
+                    color: '#6366f1'
+                }]);
+            }
+        });
+
         updateCollection('persons', items => [...items, {
             id: genId(items),
             name: formData.get('name') as string,
             memo: formData.get('memo') as string,
             businessId: businessId ? parseInt(businessId) : undefined,
-            tags: [],
+            tags: newPersonTags,
             isArchived: false
         }]);
+        setNewPersonTags([]);
+        setNewPersonTagInput('');
         setModalType(null);
     };
 
@@ -660,7 +676,7 @@ function LendingContent() {
             </Modal>
 
             {/* 相手モーダル */}
-            <Modal isOpen={modalType === 'person'} onClose={() => setModalType(null)} title="外部相手を追加">
+            <Modal isOpen={modalType === 'person'} onClose={() => { setModalType(null); setNewPersonTags([]); setNewPersonTagInput(''); }} title="外部相手を追加">
                 <form onSubmit={savePerson}>
                     <div className="form-group">
                         <label>名前</label>
@@ -676,6 +692,77 @@ function LendingContent() {
                             <option value="">選択なし</option>
                             {db.businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
+                    </div>
+                    <div className="form-group">
+                        <label>タグ（任意）</label>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                            <input
+                                type="text"
+                                value={newPersonTagInput}
+                                onChange={e => setNewPersonTagInput(e.target.value)}
+                                placeholder="タグ名を入力"
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        if (newPersonTagInput.trim() && !newPersonTags.includes(newPersonTagInput.trim())) {
+                                            setNewPersonTags([...newPersonTags, newPersonTagInput.trim()]);
+                                            setNewPersonTagInput('');
+                                        }
+                                    }
+                                }}
+                                style={{ flex: 1 }}
+                            />
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => {
+                                    if (newPersonTagInput.trim() && !newPersonTags.includes(newPersonTagInput.trim())) {
+                                        setNewPersonTags([...newPersonTags, newPersonTagInput.trim()]);
+                                        setNewPersonTagInput('');
+                                    }
+                                }}
+                            >
+                                追加
+                            </Button>
+                        </div>
+                        {newPersonTags.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                {newPersonTags.map(tag => (
+                                    <span
+                                        key={tag}
+                                        className="badge"
+                                        style={{ backgroundColor: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        {tag}
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewPersonTags(newPersonTags.filter(t => t !== tag))}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', fontSize: '14px' }}
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        {db.tags.length > 0 && (
+                            <div style={{ marginTop: '8px' }}>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>既存タグから選択:</p>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {db.tags.filter(t => !newPersonTags.includes(t.name)).map(tag => (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            className="badge"
+                                            style={{ backgroundColor: tag.color || '#6366f1', cursor: 'pointer', border: 'none' }}
+                                            onClick={() => setNewPersonTags([...newPersonTags, tag.name])}
+                                        >
+                                            + {tag.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <Button type="submit" block>追加</Button>
                 </form>
