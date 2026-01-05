@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
@@ -49,6 +49,7 @@ function CustomersContent() {
     const [paymentCourseFilter, setPaymentCourseFilter] = useState<number | ''>('');
     const [paymentServiceFilter, setPaymentServiceFilter] = useState<string>('');
     const [showWithdrawn, setShowWithdrawn] = useState(false);
+    const [expandedCustomers, setExpandedCustomers] = useState<Set<number>>(new Set());
 
     if (!db) return <div>Loading...</div>;
 
@@ -83,9 +84,21 @@ function CustomersContent() {
         const labels: Record<string, string> = {
             paypal: 'Paypal',
             univapay: 'Univapay',
-            memberpay: 'メンバーペイ'
+            memberpay: 'メンバーペイ',
+            robotpay: 'ロボットペイ'
         };
         return labels[service] || service;
+    };
+
+    // 顧客の決済IDを取得
+    const getCustomerPaymentId = (customer: Customer, paymentService: string) => {
+        switch (paymentService) {
+            case 'paypal': return customer.paypalId;
+            case 'univapay': return customer.univapayId;
+            case 'memberpay': return customer.memberpayId;
+            case 'robotpay': return customer.robotpayId;
+            default: return undefined;
+        }
     };
 
     // 顧客フィルタリング
@@ -137,6 +150,7 @@ function CustomersContent() {
             paypalId: formData.get('paypalId') as string || undefined,
             univapayId: formData.get('univapayId') as string || undefined,
             memberpayId: formData.get('memberpayId') as string || undefined,
+            robotpayId: formData.get('robotpayId') as string || undefined,
             note: formData.get('note') as string || undefined,
             tags: newCustomerTags,
             updatedAt: new Date().toISOString(),
@@ -277,11 +291,15 @@ function CustomersContent() {
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
 
+        const courseId = parseInt(formData.get('courseId') as string);
+        const course = getCourse(courseId);
+        const paymentService = course?.paymentService || 'paypal';
+
         updateCollection('subscriptions', items => [...items, {
             id: genId(items),
             customerId: subscriptionCustomerId!,
-            courseId: parseInt(formData.get('courseId') as string),
-            paymentService: formData.get('paymentService') as 'paypal' | 'univapay' | 'memberpay',
+            courseId,
+            paymentService,
             isExempt: formData.get('isExempt') === 'on',
             isActive: true,
             createdAt: new Date().toISOString()
@@ -382,6 +400,61 @@ function CustomersContent() {
     const totalChecks = monthlyChecks.length;
     const completedChecks = monthlyChecks.filter(m => m.paymentConfirmed && m.roleGranted).length;
     const progressPercent = totalChecks > 0 ? Math.round((completedChecks / totalChecks) * 100) : 0;
+
+    // 顧客ごとにグループ化
+    const groupedByCustomer = filteredChecks.reduce((acc, item) => {
+        const customerId = item.customer!.id;
+        if (!acc[customerId]) {
+            acc[customerId] = {
+                customer: item.customer!,
+                checks: []
+            };
+        }
+        acc[customerId].checks.push(item);
+        return acc;
+    }, {} as Record<number, { customer: Customer; checks: typeof filteredChecks }>);
+
+    const customerGroups = Object.values(groupedByCustomer);
+
+    // 展開状態の初期化（初回のみ全展開）
+    const initializeExpandedState = () => {
+        if (expandedCustomers.size === 0 && customerGroups.length > 0) {
+            setExpandedCustomers(new Set(customerGroups.map(g => g.customer.id)));
+        }
+    };
+    // useEffectの代わりにレンダリング時に初期化
+    if (expandedCustomers.size === 0 && customerGroups.length > 0) {
+        setTimeout(() => setExpandedCustomers(new Set(customerGroups.map(g => g.customer.id))), 0);
+    }
+
+    const toggleCustomerExpand = (customerId: number) => {
+        setExpandedCustomers(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(customerId)) {
+                newSet.delete(customerId);
+            } else {
+                newSet.add(customerId);
+            }
+            return newSet;
+        });
+    };
+
+    // 顧客の進捗状況を取得
+    const getCustomerProgress = (checks: typeof filteredChecks) => {
+        const total = checks.length;
+        const completed = checks.filter(c => c.check.paymentConfirmed && c.check.roleGranted).length;
+        if (completed === 0) return '未決済';
+        if (completed === total) return '完了';
+        return '一部未決済';
+    };
+
+    const getProgressBadgeStyle = (progress: string) => {
+        switch (progress) {
+            case '完了': return { backgroundColor: 'var(--success)', color: 'white' };
+            case '未決済': return { backgroundColor: 'var(--danger)', color: 'white' };
+            default: return { backgroundColor: '#eab308', color: 'white' };
+        }
+    };
 
     // 年月選択肢の生成
     const generateYearMonthOptions = () => {
@@ -626,6 +699,7 @@ function CustomersContent() {
                                 <option value="paypal">Paypal</option>
                                 <option value="univapay">Univapay</option>
                                 <option value="memberpay">メンバーペイ</option>
+                                <option value="robotpay">ロボットペイ</option>
                             </select>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                 <input
@@ -659,66 +733,117 @@ function CustomersContent() {
                         </div>
                     </div>
 
-                    {/* チェックリスト */}
+                    {/* チェックリスト（アコーディオン形式） */}
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead>
                                 <tr>
+                                    <th style={{ width: '40px' }}></th>
                                     <th>顧客名</th>
                                     <th>Discord</th>
-                                    <th>コース</th>
-                                    <th>決済</th>
-                                    <th style={{ textAlign: 'center' }}>決済確認</th>
-                                    <th style={{ textAlign: 'center' }}>ロール付与</th>
+                                    <th>コース数</th>
+                                    <th>進捗</th>
                                     <th>備考</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredChecks.map(({ check, customer, subscription, course, salon }) => (
-                                    <tr
-                                        key={check.id}
-                                        style={subscription?.isExempt ? { backgroundColor: 'rgba(234, 179, 8, 0.1)' } : undefined}
-                                    >
-                                        <td>
-                                            <Link
-                                                href={`/customers/${customer!.id}`}
-                                                style={{ color: 'var(--primary)', textDecoration: 'none' }}
+                                {customerGroups.map(({ customer, checks }) => {
+                                    const isExpanded = expandedCustomers.has(customer.id);
+                                    const progress = getCustomerProgress(checks);
+                                    const hasExempt = checks.some(c => c.subscription?.isExempt);
+
+                                    return (
+                                        <Fragment key={customer.id}>
+                                            {/* 親行（顧客単位） */}
+                                            <tr
+                                                onClick={() => toggleCustomerExpand(customer.id)}
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    backgroundColor: hasExempt ? 'rgba(234, 179, 8, 0.05)' : undefined
+                                                }}
                                             >
-                                                {customer!.name}
-                                            </Link>
-                                        </td>
-                                        <td>{customer!.discordName || '-'}</td>
-                                        <td>
-                                            <span className="badge badge-secondary" style={{ fontSize: '11px' }}>
-                                                {salon?.name} / {course!.name}
-                                            </span>
-                                        </td>
-                                        <td>{getPaymentServiceLabel(subscription!.paymentService)}</td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={check.paymentConfirmed}
-                                                onChange={() => togglePaymentConfirmed(check.id)}
-                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                            />
-                                        </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={check.roleGranted}
-                                                onChange={() => toggleRoleGranted(check.id)}
-                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                            />
-                                        </td>
-                                        <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {subscription?.isExempt && <span className="badge" style={{ backgroundColor: '#eab308', marginRight: '4px' }}>免除</span>}
-                                            {customer!.note || '-'}
-                                        </td>
-                                    </tr>
-                                ))}
+                                                <td style={{ textAlign: 'center', fontSize: '14px' }}>
+                                                    {isExpanded ? '▼' : '▶'}
+                                                </td>
+                                                <td>
+                                                    <Link
+                                                        href={`/customers/${customer.id}`}
+                                                        style={{ color: 'var(--primary)', textDecoration: 'none' }}
+                                                        onClick={e => e.stopPropagation()}
+                                                    >
+                                                        {customer.name}
+                                                    </Link>
+                                                </td>
+                                                <td>{customer.discordName || '-'}</td>
+                                                <td>{checks.length}件</td>
+                                                <td>
+                                                    <span className="badge" style={getProgressBadgeStyle(progress)}>
+                                                        {progress}
+                                                    </span>
+                                                </td>
+                                                <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {hasExempt && <span className="badge" style={{ backgroundColor: '#eab308', marginRight: '4px' }}>免除あり</span>}
+                                                    {customer.note || '-'}
+                                                </td>
+                                            </tr>
+
+                                            {/* 子行（コース単位） */}
+                                            {isExpanded && checks.map(({ check, subscription, course, salon }) => (
+                                                <tr
+                                                    key={`child-${check.id}`}
+                                                    style={{
+                                                        backgroundColor: subscription?.isExempt ? 'rgba(234, 179, 8, 0.1)' : 'var(--bg-secondary)'
+                                                    }}
+                                                >
+                                                    <td style={{ paddingLeft: '1.5rem', color: 'var(--text-muted)' }}>└</td>
+                                                    <td colSpan={2}>
+                                                        <span className="badge badge-secondary" style={{ fontSize: '11px' }}>
+                                                            {salon?.name} / {course!.name}
+                                                        </span>
+                                                        {subscription?.isExempt && (
+                                                            <span className="badge" style={{ backgroundColor: '#eab308', marginLeft: '4px', fontSize: '10px' }}>免除</span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ fontSize: '12px' }}>
+                                                            {getPaymentServiceLabel(course?.paymentService || subscription!.paymentService)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                            {getCustomerPaymentId(customer, course?.paymentService || subscription!.paymentService) || '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '12px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={check.paymentConfirmed}
+                                                                    onChange={() => togglePaymentConfirmed(check.id)}
+                                                                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                                                />
+                                                                決済
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '12px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={check.roleGranted}
+                                                                    onChange={() => toggleRoleGranted(check.id)}
+                                                                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                                                />
+                                                                ロール
+                                                            </label>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </Fragment>
+                                    );
+                                })}
                             </tbody>
                         </table>
-                        {filteredChecks.length === 0 && (
+                        {customerGroups.length === 0 && (
                             <div className="empty-state">
                                 <div className="empty-state-icon">&#x1F4CB;</div>
                                 <div className="empty-state-text">
@@ -763,7 +888,7 @@ function CustomersContent() {
                             <input name="lineName" defaultValue={editingCustomer?.lineName} />
                         </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div className="form-group">
                             <label>Paypal ID</label>
                             <input name="paypalId" defaultValue={editingCustomer?.paypalId} />
@@ -775,6 +900,10 @@ function CustomersContent() {
                         <div className="form-group">
                             <label>メンバーペイ ID</label>
                             <input name="memberpayId" defaultValue={editingCustomer?.memberpayId} />
+                        </div>
+                        <div className="form-group">
+                            <label>ロボットペイ ID</label>
+                            <input name="robotpayId" defaultValue={editingCustomer?.robotpayId} />
                         </div>
                     </div>
                     <div className="form-group">
@@ -868,7 +997,12 @@ function CustomersContent() {
                                 {(db.courses || []).filter(c => c.salonId === salon.id).map(course => (
                                     <div key={course.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid var(--border-color)' }}>
                                         <div>
-                                            <div>{course.name}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                {course.name}
+                                                <span className="badge badge-secondary" style={{ fontSize: '10px' }}>
+                                                    {getPaymentServiceLabel(course.paymentService || 'paypal')}
+                                                </span>
+                                            </div>
                                             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                                 ロール: {course.discordRoleName || '-'}
                                                 {course.price && ` | ¥${course.price.toLocaleString()}`}
@@ -925,6 +1059,15 @@ function CustomersContent() {
                         <input name="discordRoleName" defaultValue={editingCourse?.discordRoleName} placeholder="@role_name" />
                     </div>
                     <div className="form-group">
+                        <label>決済サービス *</label>
+                        <select name="paymentService" defaultValue={editingCourse?.paymentService || 'paypal'} required>
+                            <option value="paypal">Paypal</option>
+                            <option value="univapay">Univapay</option>
+                            <option value="memberpay">メンバーペイ</option>
+                            <option value="robotpay">ロボットペイ</option>
+                        </select>
+                    </div>
+                    <div className="form-group">
                         <label>月額（任意）</label>
                         <input name="price" type="number" defaultValue={editingCourse?.price} placeholder="9800" />
                     </div>
@@ -942,18 +1085,12 @@ function CustomersContent() {
                             {(db.salons || []).map(salon => (
                                 <optgroup key={salon.id} label={salon.name}>
                                     {(db.courses || []).filter(c => c.salonId === salon.id).map(course => (
-                                        <option key={course.id} value={course.id}>{course.name}</option>
+                                        <option key={course.id} value={course.id}>
+                                            {course.name}（{getPaymentServiceLabel(course.paymentService || 'paypal')}）
+                                        </option>
                                     ))}
                                 </optgroup>
                             ))}
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label>決済サービス *</label>
-                        <select name="paymentService" required>
-                            <option value="paypal">Paypal</option>
-                            <option value="univapay">Univapay</option>
-                            <option value="memberpay">メンバーペイ</option>
                         </select>
                     </div>
                     <div className="form-group">

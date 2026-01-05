@@ -58,7 +58,8 @@ function CustomerDetailContent() {
         const labels: Record<string, string> = {
             paypal: 'Paypal',
             univapay: 'Univapay',
-            memberpay: 'メンバーペイ'
+            memberpay: 'メンバーペイ',
+            robotpay: 'ロボットペイ'
         };
         return labels[service] || service;
     };
@@ -163,6 +164,7 @@ function CustomerDetailContent() {
             paypalId: formData.get('paypalId') as string || undefined,
             univapayId: formData.get('univapayId') as string || undefined,
             memberpayId: formData.get('memberpayId') as string || undefined,
+            robotpayId: formData.get('robotpayId') as string || undefined,
             note: formData.get('note') as string || undefined,
             updatedAt: new Date().toISOString()
         };
@@ -189,12 +191,16 @@ function CustomerDetailContent() {
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
 
+        const courseId = parseInt(formData.get('courseId') as string);
+        const course = getCourse(courseId);
+        const paymentService = course?.paymentService || 'paypal';
+
         if (editingSubscription) {
             updateCollection('subscriptions', items =>
                 items.map(s => s.id === editingSubscription.id ? {
                     ...s,
-                    courseId: parseInt(formData.get('courseId') as string),
-                    paymentService: formData.get('paymentService') as 'paypal' | 'univapay' | 'memberpay',
+                    courseId,
+                    paymentService,
                     isExempt: formData.get('isExempt') === 'on',
                 } : s)
             );
@@ -202,8 +208,8 @@ function CustomerDetailContent() {
             updateCollection('subscriptions', items => [...items, {
                 id: genId(items),
                 customerId,
-                courseId: parseInt(formData.get('courseId') as string),
-                paymentService: formData.get('paymentService') as 'paypal' | 'univapay' | 'memberpay',
+                courseId,
+                paymentService,
                 isExempt: formData.get('isExempt') === 'on',
                 isActive: true,
                 createdAt: new Date().toISOString()
@@ -288,6 +294,7 @@ function CustomerDetailContent() {
                         <div><strong>Paypal:</strong> {customer.paypalId || '-'}</div>
                         <div><strong>Univapay:</strong> {customer.univapayId || '-'}</div>
                         <div><strong>メンバーペイ:</strong> {customer.memberpayId || '-'}</div>
+                        <div><strong>ロボットペイ:</strong> {customer.robotpayId || '-'}</div>
                     </div>
                 </div>
 
@@ -347,7 +354,7 @@ function CustomerDetailContent() {
                                                 {salon?.name} / {course?.name || '不明なコース'}
                                             </div>
                                             <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                                                決済: {getPaymentServiceLabel(sub.paymentService)}
+                                                決済: {getPaymentServiceLabel(course?.paymentService || sub.paymentService)}
                                                 {sub.isExempt && <span className="badge" style={{ backgroundColor: '#eab308', marginLeft: '0.5rem' }}>免除</span>}
                                             </div>
                                             <div style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
@@ -509,7 +516,7 @@ function CustomerDetailContent() {
                             <input name="lineName" defaultValue={customer.lineName} />
                         </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div className="form-group">
                             <label>Paypal ID</label>
                             <input name="paypalId" defaultValue={customer.paypalId} />
@@ -521,6 +528,10 @@ function CustomerDetailContent() {
                         <div className="form-group">
                             <label>メンバーペイ ID</label>
                             <input name="memberpayId" defaultValue={customer.memberpayId} />
+                        </div>
+                        <div className="form-group">
+                            <label>ロボットペイ ID</label>
+                            <input name="robotpayId" defaultValue={customer.robotpayId} />
                         </div>
                     </div>
                     <div className="form-group">
@@ -591,18 +602,12 @@ function CustomerDetailContent() {
                             {(db.salons || []).map(salon => (
                                 <optgroup key={salon.id} label={salon.name}>
                                     {(db.courses || []).filter(c => c.salonId === salon.id).map(course => (
-                                        <option key={course.id} value={course.id}>{course.name}</option>
+                                        <option key={course.id} value={course.id}>
+                                            {course.name}（{getPaymentServiceLabel(course.paymentService || 'paypal')}）
+                                        </option>
                                     ))}
                                 </optgroup>
                             ))}
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label>決済サービス *</label>
-                        <select name="paymentService" defaultValue={editingSubscription?.paymentService || 'paypal'} required>
-                            <option value="paypal">Paypal</option>
-                            <option value="univapay">Univapay</option>
-                            <option value="memberpay">メンバーペイ</option>
                         </select>
                     </div>
                     <div className="form-group">
