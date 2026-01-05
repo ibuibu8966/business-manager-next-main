@@ -72,8 +72,9 @@ function PersonDetailContent() {
         return sum + (t.type === 'deposit' ? t.amount : -t.amount);
     }, 0);
 
-    // 純資産（外部相手視点）= 貸出中（資産） - 借入中（負債） + 純入出金累計
-    const netWorth = personLendingTotal - personBorrowingTotal + netFlowTotal;
+    // 純資産（外部相手視点）= 純入出金累計（元手）
+    // 貸出中・借入中は純入金の運用先であり、追加の資産ではない
+    const netWorth = netFlowTotal;
 
     const savePersonInfo = (e: React.FormEvent) => {
         e.preventDefault();
