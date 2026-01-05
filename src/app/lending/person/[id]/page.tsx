@@ -56,11 +56,11 @@ function PersonDetailContent() {
     // 純入出金取引
     const personTransactions = (db.personTransactions || []).filter(t => t.personId === personId);
 
-    // 純入出金累計（あなた視点）
-    // deposit = 相手にお金を渡す → あなたの純資産減少（マイナス）
-    // withdrawal = 相手からお金をもらう → あなたの純資産増加（プラス）
+    // 純入出金累計（外部相手視点）
+    // deposit = 外部相手にお金が入る → プラス
+    // withdrawal = 外部相手からお金が出る → マイナス
     const netFlowTotal = personTransactions.reduce((sum, t) => {
-        return sum + (t.type === 'withdrawal' ? t.amount : -t.amount);
+        return sum + (t.type === 'deposit' ? t.amount : -t.amount);
     }, 0);
 
     // 純資産 = 貸出中（資産） - 借入中（負債） + 純入出金累計
@@ -283,12 +283,12 @@ function PersonDetailContent() {
                                         <tr key={t.id}>
                                             <td>{t.date}</td>
                                             <td>
-                                                <span className={`badge ${t.type === 'withdrawal' ? 'badge-success' : 'badge-danger'}`}>
-                                                    {t.type === 'withdrawal' ? '純出金' : '純入金'}
+                                                <span className={`badge ${t.type === 'deposit' ? 'badge-success' : 'badge-danger'}`}>
+                                                    {t.type === 'deposit' ? '純入金' : '純出金'}
                                                 </span>
                                             </td>
-                                            <td style={{ color: t.type === 'withdrawal' ? 'var(--success)' : 'var(--danger)' }}>
-                                                {t.type === 'withdrawal' ? '+' : '-'}¥{t.amount.toLocaleString()}
+                                            <td style={{ color: t.type === 'deposit' ? 'var(--success)' : 'var(--danger)' }}>
+                                                {t.type === 'deposit' ? '+' : '-'}¥{t.amount.toLocaleString()}
                                             </td>
                                             <td>{t.memo || '-'}</td>
                                             <td>
