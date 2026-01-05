@@ -49,11 +49,36 @@ function PersonDetailContent() {
     );
 
     // 貸借合計計算
+    // 旧形式（personIdのみ）と新形式（counterpartyType使用）で視点が異なる
+    // 旧形式: type は外部相手視点 → borrow = 相手が借りた = ユーザーが貸した
+    // 新形式: type はユーザー視点 → lend = ユーザーが貸した
     const lendingTotal = relatedLendings
-        .filter(l => l.type === 'lend' && !l.returned)
-        .reduce((sum, l) => sum + l.amount, 0);
+        .filter(l => {
+            if (!l.returned) {
+                if (l.counterpartyType) {
+                    // 新形式: lend = ユーザーが貸している
+                    return l.type === 'lend';
+                } else {
+                    // 旧形式: borrow = 外部相手が借りた = ユーザーが貸している
+                    return l.type === 'borrow';
+                }
+            }
+            return false;
+        })
+        .reduce((sum, l) => sum + Math.abs(l.amount), 0);
     const borrowingTotal = relatedLendings
-        .filter(l => l.type === 'borrow' && !l.returned)
+        .filter(l => {
+            if (!l.returned) {
+                if (l.counterpartyType) {
+                    // 新形式: borrow = ユーザーが借りている
+                    return l.type === 'borrow';
+                } else {
+                    // 旧形式: lend = 外部相手が貸した = ユーザーが借りている
+                    return l.type === 'lend';
+                }
+            }
+            return false;
+        })
         .reduce((sum, l) => sum + Math.abs(l.amount), 0);
 
     // 純入出金取引
@@ -353,6 +378,10 @@ function PersonDetailContent() {
                                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                     .map(l => {
                                         const account = db.accounts.find(a => a.id === l.accountId);
+                                        // 旧形式と新形式で視点が異なるため、ユーザー視点に変換
+                                        const isLendingFromUser = l.counterpartyType
+                                            ? l.type === 'lend'  // 新形式: lend = ユーザーが貸している
+                                            : l.type === 'borrow'; // 旧形式: borrow = 相手が借りた = ユーザーが貸している
                                         return (
                                             <tr key={l.id}>
                                                 <td>{l.date}</td>
@@ -362,11 +391,11 @@ function PersonDetailContent() {
                                                     </Link>
                                                 </td>
                                                 <td>
-                                                    <span className={`badge ${l.type === 'lend' ? 'badge-success' : 'badge-danger'}`}>
-                                                        {l.type === 'lend' ? '貸出' : '借入'}
+                                                    <span className={`badge ${isLendingFromUser ? 'badge-success' : 'badge-danger'}`}>
+                                                        {isLendingFromUser ? '貸出' : '借入'}
                                                     </span>
                                                 </td>
-                                                <td>¥{l.amount.toLocaleString()}</td>
+                                                <td>¥{Math.abs(l.amount).toLocaleString()}</td>
                                                 <td>
                                                     <span className={`badge ${l.returned ? 'badge-secondary' : 'badge-warning'}`}>
                                                         {l.returned ? '返済済' : '未返済'}
