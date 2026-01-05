@@ -25,7 +25,12 @@ function TicketsContent() {
     if (!db) return <div>Loading...</div>;
 
     let tickets = [...db.tickets];
-    if (filterStatus) tickets = tickets.filter(t => t.status === filterStatus);
+    if (filterStatus) {
+        tickets = tickets.filter(t => t.status === filterStatus);
+    } else {
+        // 「全ステータス」の場合は完了を除外
+        tickets = tickets.filter(t => t.status !== '完了');
+    }
     if (filterSource) tickets = tickets.filter(t => t.source === filterSource);
 
     const openModal = (ticket?: Ticket) => {
@@ -396,7 +401,6 @@ function TicketsContent() {
                                     onChange={e => setNewComment(e.target.value)}
                                     placeholder="コメントを入力..."
                                     style={{ flex: 1, padding: '8px', border: '1px solid var(--border-color)', borderRadius: '4px' }}
-                                    onKeyDown={e => { if (e.key === 'Enter') addComment(); }}
                                 />
                                 <Button onClick={addComment}>送信</Button>
                             </div>
