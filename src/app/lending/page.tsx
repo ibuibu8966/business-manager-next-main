@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { useDatabase, genId } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { ReportSendButton } from '@/components/admin/ReportSendButton';
 import { Lending, Account, Person, Tag, AccountTransaction } from '@/types';
 
 function LendingContent() {
@@ -319,6 +320,7 @@ function LendingContent() {
             <div className="page-header">
                 <h3>貸借管理</h3>
                 <div className="btn-group">
+                    <ReportSendButton />
                     <Link href="/lending/archive">
                         <Button variant="ghost">📦 アーカイブ</Button>
                     </Link>
