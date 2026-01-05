@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import { LendingMonthlyReportPDF } from '@/lib/pdf/lending-report';
 import { generateMonthlyReportData } from '@/lib/reports/lending-monthly';
 import { createMonthlyReportMessage, sendLineMessage } from '@/lib/line-messaging';
-import '@/lib/pdf/fonts';
 
 export async function POST(request: NextRequest) {
     try {

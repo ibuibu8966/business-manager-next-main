@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { LendingMonthlyReportPDF } from '@/lib/pdf/lending-report';
 import { generateMonthlyReportData } from '@/lib/reports/lending-monthly';
-import '@/lib/pdf/fonts';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
