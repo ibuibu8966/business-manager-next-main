@@ -41,6 +41,7 @@ export interface Customer {
     paypalId?: string;
     univapayId?: string;
     memberpayId?: string;
+    robotpayId?: string;  // ロボットペイID
     note?: string;  // 備考（決済免除などの特記）
     isArchived?: boolean;
     createdAt?: string;
@@ -240,6 +241,7 @@ export interface Course {
     salonId: number;
     name: string;
     discordRoleName?: string;  // 付与するDiscordロール名
+    paymentService: 'paypal' | 'univapay' | 'memberpay' | 'robotpay';  // 決済サービス
     price?: number;
 }
 
@@ -248,7 +250,7 @@ export interface Subscription {
     id: number;
     customerId: number;
     courseId: number;
-    paymentService: 'paypal' | 'univapay' | 'memberpay';
+    paymentService: 'paypal' | 'univapay' | 'memberpay' | 'robotpay';  // 決済サービス（コースから自動設定）
     isExempt: boolean;        // 決済免除フラグ
     isActive: boolean;        // アクティブ/退会
     withdrawnAt?: string;     // 退会日

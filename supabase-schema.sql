@@ -177,6 +177,107 @@ CREATE TABLE IF NOT EXISTS user_settings (
   notify_hours_before INTEGER DEFAULT 24
 );
 
+-- 口座取引（受取利息・運用益・振替など）
+CREATE TABLE IF NOT EXISTS account_transactions (
+  id SERIAL PRIMARY KEY,
+  account_id INTEGER REFERENCES accounts(id),
+  from_account_id INTEGER REFERENCES accounts(id),
+  to_account_id INTEGER REFERENCES accounts(id),
+  type TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  date DATE NOT NULL,
+  memo TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 外部相手取引（純入出金）
+CREATE TABLE IF NOT EXISTS person_transactions (
+  id SERIAL PRIMARY KEY,
+  person_id INTEGER REFERENCES persons(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  date DATE NOT NULL,
+  memo TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- タグ
+CREATE TABLE IF NOT EXISTS tags (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  color TEXT
+);
+
+-- チケットソース
+CREATE TABLE IF NOT EXISTS ticket_sources (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  key TEXT NOT NULL
+);
+
+-- チケット履歴
+CREATE TABLE IF NOT EXISTS ticket_histories (
+  id SERIAL PRIMARY KEY,
+  ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  description TEXT,
+  user_id INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 顧客履歴
+CREATE TABLE IF NOT EXISTS customer_histories (
+  id SERIAL PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  description TEXT,
+  user_id INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- サロン
+CREATE TABLE IF NOT EXISTS salons (
+  id SERIAL PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  memo TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- コース
+CREATE TABLE IF NOT EXISTS courses (
+  id SERIAL PRIMARY KEY,
+  salon_id INTEGER REFERENCES salons(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  price INTEGER,
+  sessions INTEGER,
+  memo TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- サブスクリプション（顧客のコース契約）
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id SERIAL PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+  course_id INTEGER REFERENCES courses(id),
+  start_date DATE,
+  end_date DATE,
+  status TEXT DEFAULT 'active',
+  memo TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 月次チェック
+CREATE TABLE IF NOT EXISTS monthly_checks (
+  id SERIAL PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+  year_month TEXT NOT NULL,
+  checked BOOLEAN DEFAULT FALSE,
+  memo TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 初期データ
 INSERT INTO users (name, email, password, is_admin) 
 VALUES ('管理者', 'admin@example.com', 'admin123', true)
@@ -220,3 +321,13 @@ CREATE POLICY "Allow all" ON categories FOR ALL USING (true);
 CREATE POLICY "Allow all" ON contracts FOR ALL USING (true);
 CREATE POLICY "Allow all" ON manuals FOR ALL USING (true);
 CREATE POLICY "Allow all" ON user_settings FOR ALL USING (true);
+CREATE POLICY "Allow all" ON account_transactions FOR ALL USING (true);
+CREATE POLICY "Allow all" ON person_transactions FOR ALL USING (true);
+CREATE POLICY "Allow all" ON tags FOR ALL USING (true);
+CREATE POLICY "Allow all" ON ticket_sources FOR ALL USING (true);
+CREATE POLICY "Allow all" ON ticket_histories FOR ALL USING (true);
+CREATE POLICY "Allow all" ON customer_histories FOR ALL USING (true);
+CREATE POLICY "Allow all" ON salons FOR ALL USING (true);
+CREATE POLICY "Allow all" ON courses FOR ALL USING (true);
+CREATE POLICY "Allow all" ON subscriptions FOR ALL USING (true);
+CREATE POLICY "Allow all" ON monthly_checks FOR ALL USING (true);
