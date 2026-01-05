@@ -1,19 +1,16 @@
 import { Font } from '@react-pdf/renderer';
 
-// Google Fonts CDNからNoto Sans JPを登録
-// サーバーサイドでのPDF生成時に日本語フォントを使用するため
+// Noto Sans JP フォントを登録（GitHub raw URLから取得）
+// 日本語対応のTTFフォント
 Font.register({
     family: 'NotoSansJP',
-    fonts: [
-        {
-            src: 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj75s.ttf',
-            fontWeight: 'normal',
-        },
-        {
-            src: 'https://fonts.gstatic.com/s/notosansjp/v52/-F6pfjtqLzI2JPCgQBnw7HFQoggM-AsregP8VFJEk75s.ttf',
-            fontWeight: 'bold',
-        },
-    ],
+    src: 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP-Regular.ttf',
+});
+
+Font.register({
+    family: 'NotoSansJP',
+    src: 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP-Bold.ttf',
+    fontWeight: 'bold',
 });
 
 export const fontFamily = 'NotoSansJP';
