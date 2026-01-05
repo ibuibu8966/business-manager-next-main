@@ -194,6 +194,14 @@ function TicketsContent() {
         return db.users.find(u => u.id === lastHistory.userId);
     };
 
+    // 最終メモ取得
+    const getLastMemo = (ticketId: number) => {
+        const memos = db.ticketHistories
+            .filter(h => h.ticketId === ticketId && h.action === 'memo')
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return memos[0];
+    };
+
     return (
         <AppLayout title="チケット管理">
             <div className="page-header">
@@ -227,6 +235,7 @@ function TicketsContent() {
                             <th>顧客</th>
                             <th>最終担当</th>
                             <th>作成日</th>
+                            <th>最終メモ</th>
                             <th style={{ minWidth: '180px' }}>メモ入力</th>
                             <th>操作</th>
                         </tr>
@@ -260,6 +269,14 @@ function TicketsContent() {
                                     <td>{customer?.name || '-'}</td>
                                     <td>{lastHandler?.name || '-'}</td>
                                     <td>{ticket.createdAt?.split('T')[0]}</td>
+                                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {(() => {
+                                            const lastMemo = getLastMemo(ticket.id);
+                                            if (!lastMemo) return '-';
+                                            const memoUser = db.users.find(u => u.id === lastMemo.userId);
+                                            return `${memoUser?.name || '不明'}: ${lastMemo.description}`;
+                                        })()}
+                                    </td>
                                     <td>
                                         <input
                                             type="text"

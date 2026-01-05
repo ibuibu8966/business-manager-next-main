@@ -616,7 +616,7 @@ function CustomersContent() {
                                                 )}
                                             </td>
                                             <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {lastMemo?.description || '-'}
+                                                {lastMemo ? `${db.users.find(u => u.id === lastMemo.userId)?.name || '不明'}: ${lastMemo.description}` : '-'}
                                             </td>
                                             <td className="actions-cell">
                                                 <Button size="sm" variant="secondary" onClick={() => openModal(customer)}>編集</Button>
