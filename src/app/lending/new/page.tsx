@@ -47,11 +47,11 @@ function NewLendingContent() {
             }]);
         } else {
             // 対象口座が外部相手の場合 - personTransactionsに記録
-            // 外部相手が貸す = その相手からお金が出る = withdrawal
-            // 外部相手が借りる = その相手にお金が入る = deposit
+            // 貸す = あなたが相手にお金を渡す = deposit（純入金）
+            // 借りる = 相手があなたにお金を渡す = withdrawal（純出金）
             updateCollection('personTransactions', items => [...items, {
                 id: genId(items),
-                type: type === 'lend' ? 'withdrawal' : 'deposit',
+                type: type === 'lend' ? 'deposit' : 'withdrawal',
                 personId: parseInt(targetAccount[1]),
                 amount,
                 date: formData.get('date') as string,
