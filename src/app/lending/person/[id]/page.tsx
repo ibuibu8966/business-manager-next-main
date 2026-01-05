@@ -42,8 +42,11 @@ function PersonDetailContent() {
 
     const business = person.businessId ? db.businesses.find(b => b.id === person.businessId) : null;
 
-    // この相手に関連する貸借履歴
-    const relatedLendings = db.lendings.filter(l => l.personId === personId);
+    // この相手に関連する貸借履歴（旧形式: personId、新形式: counterpartyType + counterpartyId）
+    const relatedLendings = db.lendings.filter(l =>
+        l.personId === personId ||
+        (l.counterpartyType === 'person' && l.counterpartyId === personId)
+    );
 
     // 貸借合計計算
     const lendingTotal = relatedLendings
@@ -147,6 +150,23 @@ function PersonDetailContent() {
 
     const markAsReturned = (lendingId: number) => {
         if (confirm('この貸借を返済済みにしますか？')) {
+            const lending = db.lendings.find(l => l.id === lendingId);
+            if (!lending) return;
+
+            // 返済時に口座残高を更新
+            // 貸出の返済: 残高 + amount（お金が戻ってくる）
+            // 借入の返済: 残高 - |amount|（お金を返す）
+            const balanceChange = lending.type === 'lend'
+                ? Math.abs(lending.amount)
+                : -Math.abs(lending.amount);
+
+            updateCollection('accounts', items =>
+                items.map(a => a.id === lending.accountId ? {
+                    ...a,
+                    balance: (a.balance || 0) + balanceChange
+                } : a)
+            );
+
             updateCollection('lendings', items =>
                 items.map(l => l.id === lendingId ? { ...l, returned: true } : l)
             );

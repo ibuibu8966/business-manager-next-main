@@ -31,35 +31,29 @@ function NewLendingContent() {
         const type = formData.get('type') as 'lend' | 'borrow';
         const amount = parseInt(formData.get('amount') as string);
 
-        // 対象口座が社内口座の場合
-        if (targetAccount[0] === 'account') {
-            updateCollection('lendings', items => [...items, {
-                id: genId(items),
-                accountId: parseInt(targetAccount[1]),
-                counterpartyType: counterparty[0] as 'account' | 'person',
-                counterpartyId: parseInt(counterparty[1]),
-                type,
-                amount: type === 'lend' ? amount : -amount,
-                date: formData.get('date') as string,
-                memo: formData.get('memo') as string,
-                returned: false,
-                createdAt: new Date().toISOString()
-            }]);
-        } else {
-            // 対象口座が外部相手の場合 - personTransactionsに記録
-            // 外部相手視点での記録:
-            // 貸す = あなたが相手にお金を渡す = 外部相手にお金が入る = deposit（純入金）
-            // 借りる = 相手があなたにお金を渡す = 外部相手からお金が出る = withdrawal（純出金）
-            updateCollection('personTransactions', items => [...items, {
-                id: genId(items),
-                type: type === 'lend' ? 'deposit' : 'withdrawal',
-                personId: parseInt(targetAccount[1]),
-                amount,
-                date: formData.get('date') as string,
-                memo: formData.get('memo') as string,
-                createdAt: new Date().toISOString()
-            }]);
-        }
+        const accountIdNum = parseInt(targetAccount[1]);
+
+        // 残高を更新（借入=+、貸出=-）
+        updateCollection('accounts', items =>
+            items.map(a => a.id === accountIdNum ? {
+                ...a,
+                balance: (a.balance || 0) + (type === 'borrow' ? amount : -amount)
+            } : a)
+        );
+
+        // 貸借記録を追加
+        updateCollection('lendings', items => [...items, {
+            id: genId(items),
+            accountId: accountIdNum,
+            counterpartyType: counterparty[0] as 'account' | 'person',
+            counterpartyId: parseInt(counterparty[1]),
+            type,
+            amount: type === 'lend' ? amount : -amount,
+            date: formData.get('date') as string,
+            memo: formData.get('memo') as string,
+            returned: false,
+            createdAt: new Date().toISOString()
+        }]);
 
         router.push('/lending');
     };
@@ -193,14 +187,7 @@ function NewLendingContent() {
                                 <div className="form-group">
                                     <label>対象口座</label>
                                     <select name="accountId" required>
-                                        <optgroup label="社内口座">
-                                            {activeAccounts.map(a => <option key={`account:${a.id}`} value={`account:${a.id}`}>{a.name}</option>)}
-                                        </optgroup>
-                                        {activePersons.length > 0 && (
-                                            <optgroup label="外部相手">
-                                                {activePersons.map(p => <option key={`person:${p.id}`} value={`person:${p.id}`}>{p.name}</option>)}
-                                            </optgroup>
-                                        )}
+                                        {activeAccounts.map(a => <option key={a.id} value={`account:${a.id}`}>{a.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="form-group">

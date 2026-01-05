@@ -119,10 +119,20 @@ function LendingContent() {
         const counterparty = (formData.get('counterparty') as string).split(':');
         const type = formData.get('type') as 'lend' | 'borrow';
         const amount = parseInt(formData.get('amount') as string);
+        const accountIdNum = parseInt(formData.get('accountId') as string);
 
+        // 残高を更新（借入=+、貸出=-）
+        updateCollection('accounts', items =>
+            items.map(a => a.id === accountIdNum ? {
+                ...a,
+                balance: (a.balance || 0) + (type === 'borrow' ? amount : -amount)
+            } : a)
+        );
+
+        // 貸借記録を追加
         updateCollection('lendings', items => [...items, {
             id: genId(items),
-            accountId: parseInt(formData.get('accountId') as string),
+            accountId: accountIdNum,
             counterpartyType: counterparty[0] as 'account' | 'person',
             counterpartyId: parseInt(counterparty[1]),
             type,
@@ -310,6 +320,20 @@ function LendingContent() {
     };
 
     const markAsReturned = (lending: Lending) => {
+        // 返済時に残高を更新
+        // 貸出の返済: 残高 + amount（お金が戻ってくる）
+        // 借入の返済: 残高 - |amount|（お金を返す）
+        const balanceChange = lending.type === 'lend'
+            ? Math.abs(lending.amount)  // 貸出の返済: お金が戻る
+            : -Math.abs(lending.amount); // 借入の返済: お金を返す
+
+        updateCollection('accounts', items =>
+            items.map(a => a.id === lending.accountId ? {
+                ...a,
+                balance: (a.balance || 0) + balanceChange
+            } : a)
+        );
+
         updateCollection('lendings', items => [
             ...items.map(l => l.id === lending.id ? { ...l, returned: true } : l),
             {

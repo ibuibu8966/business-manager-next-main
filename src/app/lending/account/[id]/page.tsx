@@ -463,7 +463,7 @@ function AccountDetailContent() {
                                                         {l.type === 'lend' ? '貸出' : '借入'}
                                                     </span>
                                                 </td>
-                                                <td>¥{l.amount.toLocaleString()}</td>
+                                                <td>¥{Math.abs(l.amount).toLocaleString()}</td>
                                                 <td>
                                                     <span className={`badge ${l.returned ? 'badge-secondary' : 'badge-warning'}`}>
                                                         {l.returned ? '返済済' : '未返済'}
