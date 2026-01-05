@@ -42,11 +42,29 @@ function LendingContent() {
             .reduce((sum, l) => sum + l.amount, 0);
     };
 
+    // 口座の貸借残高を計算（未返済のみ）
+    // 正の値 = 貸出超過（資産）、負の値 = 借入超過（負債）
     const getAccountBalance = (accountId: number) => {
+        const relatedLendings = db.lendings.filter(l =>
+            (l.accountId === accountId ||
+             (l.counterpartyType === 'account' && l.counterpartyId === accountId)) &&
+            !l.returned
+        );
+
         let balance = 0;
-        db.lendings.forEach(l => {
-            if (l.accountId === accountId) balance -= l.amount;
-            if (l.counterpartyType === 'account' && l.counterpartyId === accountId) balance += l.amount;
+        relatedLendings.forEach(l => {
+            if (l.accountId === accountId) {
+                // この口座が主体の取引
+                // lend（貸出）= 相手に貸している = 資産（+）
+                // borrow（借入）= 相手から借りている = 負債（-）
+                balance += l.type === 'lend' ? Math.abs(l.amount) : -Math.abs(l.amount);
+            }
+            if (l.counterpartyType === 'account' && l.counterpartyId === accountId) {
+                // この口座が相手方の取引（口座間取引の場合）
+                // 相手がlend = この口座はborrow（負債）
+                // 相手がborrow = この口座はlend（資産）
+                balance += l.type === 'lend' ? -Math.abs(l.amount) : Math.abs(l.amount);
+            }
         });
         return balance;
     };
@@ -354,7 +372,27 @@ function LendingContent() {
     };
 
     const deleteLending = (id: number) => {
+        const lending = db.lendings.find(l => l.id === id);
+        if (!lending) return;
+
         if (confirm('削除しますか？')) {
+            // 未返済の場合のみ残高を元に戻す
+            if (!lending.returned) {
+                // 貸借記録時の残高変動を相殺
+                // 記録時: borrow = +amount, lend = -amount
+                // 削除時: borrow = -amount, lend = +amount
+                const balanceChange = lending.type === 'borrow'
+                    ? -Math.abs(lending.amount)  // 借入の削除: 残高を減らす
+                    : Math.abs(lending.amount);  // 貸出の削除: 残高を戻す
+
+                updateCollection('accounts', items =>
+                    items.map(a => a.id === lending.accountId ? {
+                        ...a,
+                        balance: (a.balance || 0) + balanceChange
+                    } : a)
+                );
+            }
+
             updateCollection('lendings', items => items.filter(l => l.id !== id));
         }
     };
