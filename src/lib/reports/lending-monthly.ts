@@ -32,7 +32,7 @@ export interface MonthlyReportData {
     transactions: Array<{
         id: number;
         date: string;
-        type: 'lend' | 'borrow' | 'return' | 'transfer' | 'interest' | 'investment_gain';
+        type: 'lend' | 'borrow' | 'return' | 'transfer' | 'interest' | 'investment_gain' | 'deposit' | 'withdrawal';
         displayType: string;
         amount: number;
         accountName: string;
@@ -174,10 +174,12 @@ export async function generateMonthlyReportData(
 
     // 口座取引履歴
     accountTransactions.forEach(t => {
-        const displayTypeMap = {
+        const displayTypeMap: Record<string, string> = {
             transfer: '振替',
             interest: '受取利息',
             investment_gain: t.amount < 0 ? '運用損' : '運用益',
+            deposit: '純入金',
+            withdrawal: '純出金',
         };
 
         let accountName = '-';

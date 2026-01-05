@@ -174,10 +174,10 @@ export interface Notification {
     createdAt: string;
 }
 
-// 口座取引（移転・利息・運用益）
+// 口座取引（移転・利息・運用益・純入出金）
 export interface AccountTransaction {
     id: number;
-    type: 'transfer' | 'interest' | 'investment_gain';
+    type: 'transfer' | 'interest' | 'investment_gain' | 'deposit' | 'withdrawal';
     fromAccountId?: number;   // 移転元口座（transferの場合）
     toAccountId?: number;     // 移転先口座（transferの場合）
     accountId?: number;       // 対象口座（interest/investment_gainの場合）

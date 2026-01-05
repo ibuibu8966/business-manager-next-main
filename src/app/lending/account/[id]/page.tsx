@@ -22,6 +22,8 @@ function AccountDetailContent() {
     const [incomeModalOpen, setIncomeModalOpen] = useState(false);
     const [tagModalOpen, setTagModalOpen] = useState(false);
     const [incomeType, setIncomeType] = useState<'interest' | 'investment_gain'>('interest');
+    const [netFlowModalOpen, setNetFlowModalOpen] = useState(false);
+    const [netFlowType, setNetFlowType] = useState<'deposit' | 'withdrawal'>('deposit');
     const [newTag, setNewTag] = useState('');
 
     if (!db) return <div>Loading...</div>;
@@ -165,6 +167,38 @@ function AccountDetailContent() {
         setIncomeModalOpen(false);
     };
 
+    const saveNetFlow = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const formData = new FormData(form);
+
+        const amount = Number(formData.get('amount'));
+        const date = formData.get('date') as string;
+        const memo = formData.get('memo') as string;
+
+        // AccountTransactionに追加
+        await updateCollection('accountTransactions', items => [
+            ...items,
+            {
+                id: genId(items),
+                type: netFlowType,
+                accountId,
+                amount,
+                date,
+                memo,
+                createdAt: new Date().toISOString()
+            }
+        ]);
+
+        // 残高更新（純入金なら加算、純出金なら減算）
+        const balanceChange = netFlowType === 'deposit' ? amount : -amount;
+        await updateCollection('accounts', items =>
+            items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
+        );
+
+        setNetFlowModalOpen(false);
+    };
+
     const addTag = () => {
         if (!newTag.trim()) return;
         const currentTags = account.tags || [];
@@ -207,6 +241,8 @@ function AccountDetailContent() {
             case 'transfer': return '振替';
             case 'interest': return '受取利息';
             case 'investment_gain': return '運用益';
+            case 'deposit': return '純入金';
+            case 'withdrawal': return '純出金';
             default: return type;
         }
     };
@@ -283,10 +319,11 @@ function AccountDetailContent() {
             </div>
 
             {/* 操作ボタン */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <Button onClick={() => setTransferModalOpen(true)}>💸 振替</Button>
                 <Button onClick={() => { setIncomeType('interest'); setIncomeModalOpen(true); }}>💰 受取利息</Button>
                 <Button onClick={() => { setIncomeType('investment_gain'); setIncomeModalOpen(true); }}>📈 運用益</Button>
+                <Button onClick={() => setNetFlowModalOpen(true)}>💵 純入出金</Button>
             </div>
 
             {/* 口座取引履歴 */}
@@ -317,16 +354,28 @@ function AccountDetailContent() {
                                             ? db.accounts.find(a => a.id === t.toAccountId)
                                             : db.accounts.find(a => a.id === t.fromAccountId);
 
+                                        // 金額の符号と色を決定
+                                        const isNegative = (t.type === 'transfer' && isOutgoing) || t.type === 'withdrawal';
+                                        const amountColor = isNegative ? 'var(--danger)' : 'var(--success)';
+                                        const amountPrefix = isNegative ? '-' : '+';
+
+                                        // バッジの色を決定
+                                        const getBadgeClass = () => {
+                                            if (t.type === 'transfer') return 'badge-secondary';
+                                            if (t.type === 'withdrawal') return 'badge-danger';
+                                            return 'badge-success';
+                                        };
+
                                         return (
                                             <tr key={t.id}>
                                                 <td>{t.date}</td>
                                                 <td>
-                                                    <span className={`badge ${t.type === 'transfer' ? 'badge-secondary' : 'badge-success'}`}>
+                                                    <span className={`badge ${getBadgeClass()}`}>
                                                         {getTransactionTypeLabel(t.type)}
                                                     </span>
                                                 </td>
-                                                <td style={{ color: isOutgoing && t.type === 'transfer' ? 'var(--danger)' : 'var(--success)' }}>
-                                                    {isOutgoing && t.type === 'transfer' ? '-' : '+'}¥{t.amount.toLocaleString()}
+                                                <td style={{ color: amountColor }}>
+                                                    {amountPrefix}¥{t.amount.toLocaleString()}
                                                 </td>
                                                 <td>
                                                     {t.type === 'transfer' && (
@@ -476,6 +525,39 @@ function AccountDetailContent() {
                     <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
                         ※ この取引は管理会計にも自動で反映されます
                     </p>
+                    <Button type="submit" block>登録</Button>
+                </form>
+            </Modal>
+
+            {/* 純入出金モーダル */}
+            <Modal
+                isOpen={netFlowModalOpen}
+                onClose={() => setNetFlowModalOpen(false)}
+                title="純入出金の登録"
+            >
+                <form onSubmit={saveNetFlow}>
+                    <div className="form-group">
+                        <label>種類</label>
+                        <select
+                            value={netFlowType}
+                            onChange={e => setNetFlowType(e.target.value as 'deposit' | 'withdrawal')}
+                        >
+                            <option value="deposit">純入金（残高増加）</option>
+                            <option value="withdrawal">純出金（残高減少）</option>
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label>金額</label>
+                        <input name="amount" type="number" min="1" required />
+                    </div>
+                    <div className="form-group">
+                        <label>日付</label>
+                        <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required />
+                    </div>
+                    <div className="form-group">
+                        <label>メモ</label>
+                        <textarea name="memo" />
+                    </div>
                     <Button type="submit" block>登録</Button>
                 </form>
             </Modal>
