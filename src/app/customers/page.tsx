@@ -237,6 +237,7 @@ function CustomersContent() {
             salonId: selectedSalonId!,
             name: formData.get('name') as string,
             discordRoleName: formData.get('discordRoleName') as string || undefined,
+            paymentService: (formData.get('paymentService') as 'paypal' | 'univapay' | 'memberpay' | 'robotpay') || 'paypal',
             price: formData.get('price') ? parseInt(formData.get('price') as string) : undefined,
         };
 
