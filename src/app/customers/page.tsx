@@ -739,11 +739,11 @@ function CustomersContent() {
                             <thead>
                                 <tr>
                                     <th style={{ width: '40px' }}></th>
-                                    <th>顧客名</th>
-                                    <th>Discord</th>
-                                    <th>コース数</th>
-                                    <th>進捗</th>
-                                    <th>備考</th>
+                                    <th>顧客名 / 決済会社</th>
+                                    <th>Discord / 決済ID</th>
+                                    <th>コース</th>
+                                    <th>進捗 / 確認</th>
+                                    <th style={{ minWidth: '200px' }}>メモ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -780,9 +780,9 @@ function CustomersContent() {
                                                     <span className="badge" style={getProgressBadgeStyle(progress)}>
                                                         {progress}
                                                     </span>
+                                                    {hasExempt && <span className="badge" style={{ backgroundColor: '#eab308', marginLeft: '4px' }}>免除あり</span>}
                                                 </td>
-                                                <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {hasExempt && <span className="badge" style={{ backgroundColor: '#eab308', marginRight: '4px' }}>免除あり</span>}
+                                                <td style={{ fontSize: '12px', whiteSpace: 'pre-wrap' }}>
                                                     {customer.note || '-'}
                                                 </td>
                                             </tr>
@@ -796,7 +796,20 @@ function CustomersContent() {
                                                     }}
                                                 >
                                                     <td style={{ paddingLeft: '1.5rem', color: 'var(--text-muted)' }}>└</td>
-                                                    <td colSpan={2}>
+                                                    {/* 決済会社 */}
+                                                    <td>
+                                                        <span style={{ fontSize: '12px' }}>
+                                                            {getPaymentServiceLabel(course?.paymentService || subscription!.paymentService)}
+                                                        </span>
+                                                    </td>
+                                                    {/* 決済ID */}
+                                                    <td>
+                                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                            {getCustomerPaymentId(customer, course?.paymentService || subscription!.paymentService) || '-'}
+                                                        </span>
+                                                    </td>
+                                                    {/* コース */}
+                                                    <td>
                                                         <span className="badge badge-secondary" style={{ fontSize: '11px' }}>
                                                             {salon?.name} / {course!.name}
                                                         </span>
@@ -804,16 +817,7 @@ function CustomersContent() {
                                                             <span className="badge" style={{ backgroundColor: '#eab308', marginLeft: '4px', fontSize: '10px' }}>免除</span>
                                                         )}
                                                     </td>
-                                                    <td>
-                                                        <span style={{ fontSize: '12px' }}>
-                                                            {getPaymentServiceLabel(course?.paymentService || subscription!.paymentService)}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                            {getCustomerPaymentId(customer, course?.paymentService || subscription!.paymentService) || '-'}
-                                                        </span>
-                                                    </td>
+                                                    {/* 備考（チェックボックス） */}
                                                     <td>
                                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '12px', cursor: 'pointer' }}>
@@ -821,6 +825,7 @@ function CustomersContent() {
                                                                     type="checkbox"
                                                                     checked={check.paymentConfirmed}
                                                                     onChange={() => togglePaymentConfirmed(check.id)}
+                                                                    onClick={e => e.stopPropagation()}
                                                                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                                                                 />
                                                                 決済
@@ -830,11 +835,16 @@ function CustomersContent() {
                                                                     type="checkbox"
                                                                     checked={check.roleGranted}
                                                                     onChange={() => toggleRoleGranted(check.id)}
+                                                                    onClick={e => e.stopPropagation()}
                                                                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                                                                 />
                                                                 ロール
                                                             </label>
                                                         </div>
+                                                    </td>
+                                                    {/* メモ */}
+                                                    <td style={{ fontSize: '12px', whiteSpace: 'pre-wrap', minWidth: '200px' }}>
+                                                        {customer.note || '-'}
                                                     </td>
                                                 </tr>
                                             ))}
