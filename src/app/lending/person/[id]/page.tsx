@@ -167,7 +167,7 @@ function PersonDetailContent() {
         }
     };
 
-    const markAsReturned = (lendingId: number) => {
+    const markAsReturned = async (lendingId: number) => {
         if (confirm('この貸借を返済済みにしますか？')) {
             const lending = db.lendings.find(l => l.id === lendingId);
             if (!lending) return;
@@ -179,16 +179,30 @@ function PersonDetailContent() {
                 ? Math.abs(lending.amount)
                 : -Math.abs(lending.amount);
 
-            updateCollection('accounts', items =>
+            await updateCollection('accounts', items =>
                 items.map(a => a.id === lending.accountId ? {
                     ...a,
                     balance: (a.balance || 0) + balanceChange
                 } : a)
             );
 
-            updateCollection('lendings', items =>
-                items.map(l => l.id === lendingId ? { ...l, returned: true } : l)
-            );
+            await updateCollection('lendings', items => [
+                ...items.map(l => l.id === lendingId ? { ...l, returned: true } : l),
+                {
+                    id: genId(items),
+                    accountId: lending.accountId,
+                    counterpartyType: lending.counterpartyType,
+                    counterpartyId: lending.counterpartyId,
+                    personId: lending.personId,
+                    type: 'return' as const,
+                    amount: -lending.amount,
+                    date: new Date().toISOString().split('T')[0],
+                    memo: '返済',
+                    returned: true,
+                    originalId: lending.id,
+                    createdAt: new Date().toISOString()
+                }
+            ]);
         }
     };
 

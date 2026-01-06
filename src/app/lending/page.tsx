@@ -35,10 +35,14 @@ function LendingContent() {
         ? activePersons.filter(p => p.tags?.includes(filterTag))
         : activePersons;
 
-    // 残高計算（貸借のみ）
+    // 残高計算（貸借のみ、未返済分）
     const getPersonBalance = (personId: number) => {
         return db.lendings
-            .filter(l => (l.counterpartyType === 'person' && l.counterpartyId === personId) || (!l.counterpartyType && l.personId === personId))
+            .filter(l =>
+                ((l.counterpartyType === 'person' && l.counterpartyId === personId) ||
+                 (!l.counterpartyType && l.personId === personId)) &&
+                !l.returned
+            )
             .reduce((sum, l) => sum + l.amount, 0);
     };
 
@@ -156,7 +160,7 @@ function LendingContent() {
         }))
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    const saveLending = (e: React.FormEvent) => {
+    const saveLending = async (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -166,7 +170,7 @@ function LendingContent() {
         const accountIdNum = parseInt(formData.get('accountId') as string);
 
         // 残高を更新（借入=+、貸出=-）
-        updateCollection('accounts', items =>
+        await updateCollection('accounts', items =>
             items.map(a => a.id === accountIdNum ? {
                 ...a,
                 balance: (a.balance || 0) + (type === 'borrow' ? amount : -amount)
@@ -174,7 +178,7 @@ function LendingContent() {
         );
 
         // 貸借記録を追加
-        updateCollection('lendings', items => [...items, {
+        await updateCollection('lendings', items => [...items, {
             id: genId(items),
             accountId: accountIdNum,
             counterpartyType: counterparty[0] as 'account' | 'person',
@@ -363,7 +367,7 @@ function LendingContent() {
         setModalType(null);
     };
 
-    const markAsReturned = (lending: Lending) => {
+    const markAsReturned = async (lending: Lending) => {
         // 返済時に残高を更新
         // 貸出の返済: 残高 + amount（お金が戻ってくる）
         // 借入の返済: 残高 - |amount|（お金を返す）
@@ -371,14 +375,14 @@ function LendingContent() {
             ? Math.abs(lending.amount)  // 貸出の返済: お金が戻る
             : -Math.abs(lending.amount); // 借入の返済: お金を返す
 
-        updateCollection('accounts', items =>
+        await updateCollection('accounts', items =>
             items.map(a => a.id === lending.accountId ? {
                 ...a,
                 balance: (a.balance || 0) + balanceChange
             } : a)
         );
 
-        updateCollection('lendings', items => [
+        await updateCollection('lendings', items => [
             ...items.map(l => l.id === lending.id ? { ...l, returned: true } : l),
             {
                 id: genId(items),
@@ -397,7 +401,7 @@ function LendingContent() {
         ]);
     };
 
-    const deleteLending = (id: number) => {
+    const deleteLending = async (id: number) => {
         const lending = db.lendings.find(l => l.id === id);
         if (!lending) return;
 
@@ -411,7 +415,7 @@ function LendingContent() {
                     ? -Math.abs(lending.amount)  // 借入の削除: 残高を減らす
                     : Math.abs(lending.amount);  // 貸出の削除: 残高を戻す
 
-                updateCollection('accounts', items =>
+                await updateCollection('accounts', items =>
                     items.map(a => a.id === lending.accountId ? {
                         ...a,
                         balance: (a.balance || 0) + balanceChange
@@ -419,7 +423,7 @@ function LendingContent() {
                 );
             }
 
-            updateCollection('lendings', items => items.filter(l => l.id !== id));
+            await updateCollection('lendings', items => items.filter(l => l.id !== id));
         }
     };
 

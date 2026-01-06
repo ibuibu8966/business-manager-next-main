@@ -20,7 +20,7 @@ function NewLendingContent() {
     const activeAccounts = db.accounts.filter(a => !a.isArchived);
     const activePersons = db.persons.filter(p => !p.isArchived);
 
-    const saveLending = (e: React.FormEvent) => {
+    const saveLending = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
@@ -34,7 +34,7 @@ function NewLendingContent() {
         const accountIdNum = parseInt(targetAccount[1]);
 
         // 残高を更新（借入=+、貸出=-）
-        updateCollection('accounts', items =>
+        await updateCollection('accounts', items =>
             items.map(a => a.id === accountIdNum ? {
                 ...a,
                 balance: (a.balance || 0) + (type === 'borrow' ? amount : -amount)
@@ -42,7 +42,7 @@ function NewLendingContent() {
         );
 
         // 貸借記録を追加
-        updateCollection('lendings', items => [...items, {
+        await updateCollection('lendings', items => [...items, {
             id: genId(items),
             accountId: accountIdNum,
             counterpartyType: counterparty[0] as 'account' | 'person',

@@ -166,23 +166,24 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     ) => {
         // 関数型更新を使用して最新の状態を取得
         let newDbResult: Database | null = null;
+        let capturedOldItems: Database[K] | null = null;
+        let capturedNewItems: Database[K] | null = null;
 
         setDb(currentDb => {
             if (!currentDb) return currentDb;
 
-            const oldItems = currentDb[key];
-            const newItems = updater(oldItems);
-            newDbResult = { ...currentDb, [key]: newItems };
+            capturedOldItems = currentDb[key];
+            capturedNewItems = updater(capturedOldItems);
+            newDbResult = { ...currentDb, [key]: capturedNewItems };
             return newDbResult;
         });
 
         // setDbの更新が完了するまで少し待つ
         await new Promise(resolve => setTimeout(resolve, 0));
 
-        if (!newDbResult) return;
-        const newDb = newDbResult;
-        const oldItems = db?.[key] || ([] as unknown as Database[K]);
-        const newItems = newDb[key];
+        if (!newDbResult || !capturedOldItems || !capturedNewItems) return;
+        const oldItems = capturedOldItems;
+        const newItems = capturedNewItems;
 
         if (useSupabaseState && supabase) {
             const tableName = tableNames[key as keyof typeof tableNames];
@@ -244,9 +245,9 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
                 console.error('Supabase update failed:', e);
             }
         } else {
-            saveToLocalStorage(newDb);
+            saveToLocalStorage(newDbResult);
         }
-    }, [db, useSupabaseState]);
+    }, [useSupabaseState]);
 
     return createElement(
         DatabaseContext.Provider,
