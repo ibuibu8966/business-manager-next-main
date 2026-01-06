@@ -427,9 +427,45 @@ function LendingContent() {
         }
     };
 
-    const deleteAccountTransaction = (id: number) => {
+    const deleteAccountTransaction = async (id: number) => {
+        const transaction = (db.accountTransactions || []).find(t => t.id === id);
+        if (!transaction) return;
+
         if (confirm('削除しますか？')) {
-            updateCollection('accountTransactions', items => items.filter(t => t.id !== id));
+            // 残高を逆算して更新
+            const accountId = transaction.accountId || transaction.fromAccountId;
+            if (accountId) {
+                let balanceChange = 0;
+                if (transaction.type === 'interest' || transaction.type === 'investment_gain' || transaction.type === 'deposit') {
+                    balanceChange = -transaction.amount; // 加算していた分を減算
+                } else if (transaction.type === 'withdrawal') {
+                    balanceChange = transaction.amount; // 減算していた分を加算
+                } else if (transaction.type === 'transfer') {
+                    // 振替の場合は from/to 両方を更新
+                    await updateCollection('accounts', items =>
+                        items.map(a => {
+                            if (a.id === transaction.fromAccountId) {
+                                return { ...a, balance: (a.balance || 0) + transaction.amount };
+                            }
+                            if (a.id === transaction.toAccountId) {
+                                return { ...a, balance: (a.balance || 0) - transaction.amount };
+                            }
+                            return a;
+                        })
+                    );
+                }
+
+                if (transaction.type !== 'transfer' && balanceChange !== 0) {
+                    await updateCollection('accounts', items =>
+                        items.map(a => a.id === accountId ? {
+                            ...a,
+                            balance: (a.balance || 0) + balanceChange
+                        } : a)
+                    );
+                }
+            }
+
+            await updateCollection('accountTransactions', items => items.filter(t => t.id !== id));
         }
     };
 
