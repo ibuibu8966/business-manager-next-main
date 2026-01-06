@@ -25,6 +25,10 @@ export interface Task {
     createdAt: string;
     showAfter?: string;          // この日時まで非表示（リマインダー）
     notifyHoursBefore?: number;  // LINE通知タイミング（将来用）
+    // マニュアル・チェックリスト連携
+    attachedManualId?: number;      // 添付マニュアルID
+    attachedChecklistId?: number;   // 元チェックリストID（テンプレート参照用）
+    checklistBlocks?: ChecklistBlock[];  // タスク専用チェックリスト（コピー・編集可能）
 }
 
 export interface Customer {

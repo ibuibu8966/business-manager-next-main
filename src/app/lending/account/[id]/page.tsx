@@ -46,10 +46,12 @@ function AccountDetailContent() {
 
     const business = account.businessId ? db.businesses.find(b => b.id === account.businessId) : null;
 
-    // この口座に関連する貸借履歴（相手方として参照されている取引も含む）
+    // この口座に関連する貸借履歴（相手方として参照されている取引も含む、アーカイブ済みは除外）
     const relatedLendings = db.lendings.filter(l =>
-        l.accountId === accountId ||
-        (l.counterpartyType === 'account' && l.counterpartyId === accountId)
+        !l.isArchived && (
+            l.accountId === accountId ||
+            (l.counterpartyType === 'account' && l.counterpartyId === accountId)
+        )
     );
 
     // この口座に関連する取引（移転・利息・運用益）

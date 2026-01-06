@@ -7,7 +7,8 @@ import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
 import { useDatabase, genId } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
-import { Task } from '@/types';
+import { BusinessResourceSelector } from '@/components/task/BusinessResourceSelector';
+import { Task, ChecklistBlock } from '@/types';
 
 function NewTaskContent() {
     const router = useRouter();
@@ -15,7 +16,22 @@ function NewTaskContent() {
     const { user, logout } = useAuth();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // マニュアル・チェックリスト選択用の状態
+    const [selectedBusinessId, setSelectedBusinessId] = useState<number | undefined>(undefined);
+    const [selectedManualId, setSelectedManualId] = useState<number | undefined>(undefined);
+    const [selectedChecklistId, setSelectedChecklistId] = useState<number | undefined>(undefined);
+    const [checklistBlocks, setChecklistBlocks] = useState<ChecklistBlock[] | undefined>(undefined);
+
     if (!db) return <div>Loading...</div>;
+
+    // 事業選択時のハンドラ
+    const handleBusinessChange = (businessId: number | undefined) => {
+        setSelectedBusinessId(businessId);
+        // 事業が変わったらリソース選択をリセット
+        setSelectedManualId(undefined);
+        setSelectedChecklistId(undefined);
+        setChecklistBlocks(undefined);
+    };
 
     const saveTask = (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,9 +47,13 @@ function NewTaskContent() {
             priority: formData.get('priority') as Task['priority'],
             dueDate: (formData.get('dueDate') as string) || undefined,
             showAfter: (formData.get('showAfter') as string) || undefined,
-            businessId: formData.get('businessId') ? Number(formData.get('businessId')) : undefined,
+            businessId: selectedBusinessId,
             assigneeId: formData.get('assigneeId') ? Number(formData.get('assigneeId')) : undefined,
             userId: user?.id || 1,
+            // マニュアル・チェックリスト連携
+            attachedManualId: selectedManualId,
+            attachedChecklistId: selectedChecklistId,
+            checklistBlocks: checklistBlocks,
         };
 
         const newId = genId(db.tasks);
@@ -89,6 +109,9 @@ function NewTaskContent() {
                     display: flex;
                     gap: 12px;
                     margin-top: 24px;
+                }
+                .resource-selector-wrapper {
+                    margin: 16px 0;
                 }
                 @media (max-width: 600px) {
                     :global(#main-header) {
@@ -198,7 +221,11 @@ function NewTaskContent() {
                     <div className="form-row">
                         <div className="form-group">
                             <label>事業</label>
-                            <select name="businessId" defaultValue="">
+                            <select
+                                name="businessId"
+                                value={selectedBusinessId || ''}
+                                onChange={e => handleBusinessChange(e.target.value ? Number(e.target.value) : undefined)}
+                            >
                                 <option value="">未設定</option>
                                 {db.businesses.map(b => (
                                     <option key={b.id} value={b.id}>{b.name}</option>
@@ -215,6 +242,23 @@ function NewTaskContent() {
                             </select>
                         </div>
                     </div>
+
+                    {/* 事業選択時にマニュアル・チェックリスト選択を表示 */}
+                    {selectedBusinessId && (
+                        <div className="resource-selector-wrapper">
+                            <BusinessResourceSelector
+                                businessId={selectedBusinessId}
+                                selectedManualId={selectedManualId}
+                                selectedChecklistId={selectedChecklistId}
+                                onManualSelect={setSelectedManualId}
+                                onChecklistSelect={(checklistId, blocks) => {
+                                    setSelectedChecklistId(checklistId);
+                                    setChecklistBlocks(blocks);
+                                }}
+                            />
+                        </div>
+                    )}
+
                     <div className="form-actions">
                         <Button type="submit" disabled={isSubmitting}>
                             {isSubmitting ? '保存中...' : 'タスクを作成'}
