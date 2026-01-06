@@ -539,7 +539,16 @@ function LendingContent() {
                                     </span>
                                 </div>
                                 <span className="person-meta">{balance > 0 ? '貸し' : balance < 0 ? '借り' : '精算済'}</span>
-                                <div style={{ fontSize: '12px', color: accountBalance >= 0 ? 'var(--primary)' : 'var(--danger)', marginTop: '4px' }}>
+                                <div style={{
+                                    fontSize: '18px',
+                                    fontWeight: 'bold',
+                                    color: accountBalance >= 0 ? '#10b981' : '#ef4444',
+                                    marginTop: '8px',
+                                    padding: '4px 8px',
+                                    backgroundColor: accountBalance >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                    borderRadius: '4px',
+                                    display: 'inline-block'
+                                }}>
                                     口座: ¥{accountBalance.toLocaleString()}
                                 </div>
                                 {business && (
