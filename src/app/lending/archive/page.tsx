@@ -15,6 +15,10 @@ function ArchiveContent() {
     const archivedAccounts = db.accounts.filter(a => a.isArchived);
     const archivedPersons = db.persons.filter(p => p.isArchived);
 
+    // アーカイブ済み取引履歴
+    const archivedLendings = db.lendings.filter(l => l.isArchived);
+    const archivedTransactions = (db.accountTransactions || []).filter(t => t.isArchived);
+
     const unarchiveAccount = (id: number) => {
         if (confirm('この口座のアーカイブを取り消しますか？')) {
             updateCollection('accounts', items =>
@@ -31,7 +35,22 @@ function ArchiveContent() {
         }
     };
 
-    const hasArchivedItems = archivedAccounts.length > 0 || archivedPersons.length > 0;
+    // 取引種類の表示名を取得
+    const getTransactionTypeDisplay = (type: string, amount: number) => {
+        switch (type) {
+            case 'lend': return '貸し';
+            case 'borrow': return '借り';
+            case 'return': return '返済';
+            case 'transfer': return '振替';
+            case 'interest': return '受取利息';
+            case 'investment_gain': return amount < 0 ? '運用損' : '運用益';
+            case 'deposit': return '純入金';
+            case 'withdrawal': return '純出金';
+            default: return type;
+        }
+    };
+
+    const hasArchivedItems = archivedAccounts.length > 0 || archivedPersons.length > 0 || archivedLendings.length > 0 || archivedTransactions.length > 0;
 
     return (
         <AppLayout title="アーカイブ一覧">
@@ -108,7 +127,7 @@ function ArchiveContent() {
                     </div>
 
                     {/* アーカイブ済み外部相手 */}
-                    <div className="card">
+                    <div className="card" style={{ marginBottom: '1.5rem' }}>
                         <h4 style={{ marginBottom: '1rem' }}>外部相手</h4>
                         {archivedPersons.length === 0 ? (
                             <div style={{ color: 'var(--text-secondary)', padding: '1rem' }}>
@@ -161,6 +180,94 @@ function ArchiveContent() {
                                         </div>
                                     );
                                 })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* アーカイブ済み取引履歴 */}
+                    <div className="card">
+                        <h4 style={{ marginBottom: '1rem' }}>取引履歴</h4>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                            ※ 取引履歴のアーカイブは復活できません（閲覧のみ）
+                        </p>
+                        {archivedLendings.length === 0 && archivedTransactions.length === 0 ? (
+                            <div style={{ color: 'var(--text-secondary)', padding: '1rem' }}>
+                                アーカイブ済みの取引はありません
+                            </div>
+                        ) : (
+                            <div className="data-table-container">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>日付</th>
+                                            <th>口座</th>
+                                            <th>相手/詳細</th>
+                                            <th>種類</th>
+                                            <th>金額</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {/* アーカイブ済み貸借履歴 */}
+                                        {archivedLendings.map(l => {
+                                            const account = db.accounts.find(a => a.id === l.accountId);
+                                            let counterpartyName = '-';
+                                            if (l.counterpartyType === 'account') {
+                                                const acc = db.accounts.find(a => a.id === l.counterpartyId);
+                                                counterpartyName = acc ? `💼 ${acc.name}` : '?';
+                                            } else {
+                                                const person = db.persons.find(p => p.id === (l.counterpartyId || l.personId));
+                                                counterpartyName = person?.name || '?';
+                                            }
+                                            const displayType = l.type === 'return' ? '返済' : (l.amount > 0 ? '貸し' : '借り');
+
+                                            return (
+                                                <tr key={`lending-${l.id}`}>
+                                                    <td>{l.date}</td>
+                                                    <td>{account?.name || '-'}</td>
+                                                    <td>{counterpartyName}</td>
+                                                    <td><span className="badge badge-secondary">{displayType}</span></td>
+                                                    <td style={{ color: l.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                        {l.amount >= 0 ? '' : '-'}¥{Math.abs(l.amount).toLocaleString()}
+                                                    </td>
+                                                    <td>
+                                                        <Link href={`/lending/transaction/lending-${l.id}`}>
+                                                            <Button size="sm" variant="ghost">詳細</Button>
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {/* アーカイブ済み口座取引履歴 */}
+                                        {archivedTransactions.map(t => {
+                                            const account = t.type === 'transfer'
+                                                ? db.accounts.find(a => a.id === t.fromAccountId)
+                                                : db.accounts.find(a => a.id === t.accountId);
+                                            let detailText = '-';
+                                            if (t.type === 'transfer') {
+                                                const toAccount = db.accounts.find(a => a.id === t.toAccountId);
+                                                detailText = `→ ${toAccount?.name || '?'}`;
+                                            }
+
+                                            return (
+                                                <tr key={`transaction-${t.id}`}>
+                                                    <td>{t.date}</td>
+                                                    <td>{account?.name || '-'}</td>
+                                                    <td>{detailText}</td>
+                                                    <td><span className="badge badge-secondary">{getTransactionTypeDisplay(t.type, t.amount)}</span></td>
+                                                    <td style={{ color: t.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                        {t.amount >= 0 ? '' : '-'}¥{Math.abs(t.amount).toLocaleString()}
+                                                    </td>
+                                                    <td>
+                                                        <Link href={`/lending/transaction/transaction-${t.id}`}>
+                                                            <Button size="sm" variant="ghost">詳細</Button>
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </div>

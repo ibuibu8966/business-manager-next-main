@@ -278,6 +278,28 @@ CREATE TABLE IF NOT EXISTS monthly_checks (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 貸借履歴（編集追跡用）
+CREATE TABLE IF NOT EXISTS lending_histories (
+  id SERIAL PRIMARY KEY,
+  lending_id INTEGER REFERENCES lendings(id) ON DELETE CASCADE,
+  action TEXT NOT NULL, -- 'created', 'updated', 'archived', 'returned'
+  description TEXT NOT NULL,
+  changes TEXT, -- JSON形式のフィールド変更詳細
+  user_id INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 口座取引履歴（編集追跡用）
+CREATE TABLE IF NOT EXISTS account_transaction_histories (
+  id SERIAL PRIMARY KEY,
+  account_transaction_id INTEGER REFERENCES account_transactions(id) ON DELETE CASCADE,
+  action TEXT NOT NULL, -- 'created', 'updated', 'archived'
+  description TEXT NOT NULL,
+  changes TEXT, -- JSON形式のフィールド変更詳細
+  user_id INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 初期データ
 INSERT INTO users (name, email, password, is_admin) 
 VALUES ('管理者', 'admin@example.com', 'admin123', true)
@@ -331,3 +353,22 @@ CREATE POLICY "Allow all" ON salons FOR ALL USING (true);
 CREATE POLICY "Allow all" ON courses FOR ALL USING (true);
 CREATE POLICY "Allow all" ON subscriptions FOR ALL USING (true);
 CREATE POLICY "Allow all" ON monthly_checks FOR ALL USING (true);
+CREATE POLICY "Allow all" ON lending_histories FOR ALL USING (true);
+CREATE POLICY "Allow all" ON account_transaction_histories FOR ALL USING (true);
+
+-- =====================================================
+-- 貸借取引履歴機能拡張用のカラム追加（既存テーブル）
+-- 既存のテーブルに対して実行してください
+-- =====================================================
+
+-- lendings テーブルに編集追跡用カラムを追加
+ALTER TABLE lendings ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE lendings ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id);
+ALTER TABLE lendings ADD COLUMN IF NOT EXISTS last_edited_by_user_id INTEGER REFERENCES users(id);
+ALTER TABLE lendings ADD COLUMN IF NOT EXISTS last_edited_at TIMESTAMPTZ;
+
+-- account_transactions テーブルに編集追跡用カラムを追加
+ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id);
+ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS last_edited_by_user_id INTEGER REFERENCES users(id);
+ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS last_edited_at TIMESTAMPTZ;

@@ -9,9 +9,11 @@ import { useDatabase, genId } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ReportSendButton } from '@/components/admin/ReportSendButton';
-import { Lending, Account, Person, Tag, AccountTransaction } from '@/types';
+import { TransactionEditModal, CombinedTransaction, FieldChange, generateChangeDescription } from '@/components/lending/TransactionEditModal';
+import { Lending, Account, Person, Tag, AccountTransaction, LendingHistory, AccountTransactionHistory } from '@/types';
 
 function LendingContent() {
+    const { user } = useAuth();
     const { db, updateCollection } = useDatabase();
     const [modalType, setModalType] = useState<'lending' | 'account' | 'person' | 'tag' | 'transfer' | 'income' | null>(null);
     const [filterStatus, setFilterStatus] = useState('');
@@ -20,6 +22,9 @@ function LendingContent() {
     const [newTagInput, setNewTagInput] = useState('');
     const [newPersonTags, setNewPersonTags] = useState<string[]>([]);
     const [newPersonTagInput, setNewPersonTagInput] = useState('');
+    // 編集モーダル用
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editingTransaction, setEditingTransaction] = useState<CombinedTransaction | null>(null);
 
     if (!db) return <div>Loading...</div>;
 
@@ -124,10 +129,10 @@ function LendingContent() {
     const totalLent = activePersons.reduce((s, p) => { const b = getPersonBalance(p.id); return b > 0 ? s + b : s; }, 0);
     const totalBorrowed = activePersons.reduce((s, p) => { const b = getPersonBalance(p.id); return b < 0 ? s + Math.abs(b) : s; }, 0);
 
-    // 統合履歴の作成（貸借 + 口座取引）
+    // 統合履歴の作成（貸借 + 口座取引）- アーカイブ済みを除外
     const combinedHistory = [
-        // 貸借履歴
-        ...lendings.map(l => ({
+        // 貸借履歴（アーカイブ済みを除外）
+        ...lendings.filter(l => !l.isArchived).map(l => ({
             id: `lending-${l.id}`,
             date: l.date,
             type: l.type === 'return' ? 'return' : (l.amount > 0 ? 'lend' : 'borrow'),
@@ -139,10 +144,13 @@ function LendingContent() {
             memo: l.memo,
             returned: l.returned,
             source: 'lending' as const,
-            originalId: l.id
+            originalId: l.id,
+            createdByUserId: l.createdByUserId,
+            lastEditedByUserId: l.lastEditedByUserId,
+            lastEditedAt: l.lastEditedAt,
         })),
-        // 口座取引履歴（受取利息・運用益・振替）
-        ...(db.accountTransactions || []).map(t => ({
+        // 口座取引履歴（受取利息・運用益・振替）- アーカイブ済みを除外
+        ...(db.accountTransactions || []).filter(t => !t.isArchived).map(t => ({
             id: `transaction-${t.id}`,
             date: t.date,
             type: t.type,
@@ -156,7 +164,10 @@ function LendingContent() {
             toAccountId: t.toAccountId,
             memo: t.memo,
             source: 'transaction' as const,
-            originalId: t.id
+            originalId: t.id,
+            createdByUserId: t.createdByUserId,
+            lastEditedByUserId: t.lastEditedByUserId,
+            lastEditedAt: t.lastEditedAt,
         }))
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -178,8 +189,9 @@ function LendingContent() {
         );
 
         // 貸借記録を追加
+        const newLendingId = genId(db.lendings);
         await updateCollection('lendings', items => [...items, {
-            id: genId(items),
+            id: newLendingId,
             accountId: accountIdNum,
             counterpartyType: counterparty[0] as 'account' | 'person',
             counterpartyId: parseInt(counterparty[1]),
@@ -188,8 +200,20 @@ function LendingContent() {
             date: formData.get('date') as string,
             memo: formData.get('memo') as string,
             returned: false,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            createdByUserId: user?.id,
         }]);
+
+        // 履歴を記録
+        await updateCollection('lendingHistories', items => [...items, {
+            id: genId(items),
+            lendingId: newLendingId,
+            action: 'created' as const,
+            description: '作成',
+            userId: user?.id || 1,
+            createdAt: new Date().toISOString(),
+        }]);
+
         setModalType(null);
     };
 
@@ -305,24 +329,50 @@ function LendingContent() {
         updateCollection('tags', items => items.filter(t => t.id !== tagId));
     };
 
-    const saveTransfer = (e: React.FormEvent) => {
+    const saveTransfer = async (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
-        updateCollection('accountTransactions', items => [...items, {
-            id: genId(items),
+        const fromAccountId = parseInt(formData.get('fromAccountId') as string);
+        const toAccountId = parseInt(formData.get('toAccountId') as string);
+        const amount = parseInt(formData.get('amount') as string);
+
+        // 残高を更新（振替元から減算、振替先に加算）
+        await updateCollection('accounts', items =>
+            items.map(a => {
+                if (a.id === fromAccountId) return { ...a, balance: (a.balance || 0) - amount };
+                if (a.id === toAccountId) return { ...a, balance: (a.balance || 0) + amount };
+                return a;
+            })
+        );
+
+        const newTransactionId = genId(db.accountTransactions || []);
+        await updateCollection('accountTransactions', items => [...items, {
+            id: newTransactionId,
             type: 'transfer' as const,
-            fromAccountId: parseInt(formData.get('fromAccountId') as string),
-            toAccountId: parseInt(formData.get('toAccountId') as string),
-            amount: parseInt(formData.get('amount') as string),
+            fromAccountId,
+            toAccountId,
+            amount,
             date: formData.get('date') as string,
             memo: formData.get('memo') as string,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            createdByUserId: user?.id,
         }]);
+
+        // 履歴を記録
+        await updateCollection('accountTransactionHistories', items => [...items, {
+            id: genId(items),
+            accountTransactionId: newTransactionId,
+            action: 'created' as const,
+            description: '作成',
+            userId: user?.id || 1,
+            createdAt: new Date().toISOString(),
+        }]);
+
         setModalType(null);
     };
 
-    const saveIncome = (e: React.FormEvent) => {
+    const saveIncome = async (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -332,17 +382,37 @@ function LendingContent() {
         const amount = parseInt(formData.get('amount') as string);
         const date = formData.get('date') as string;
         const memo = formData.get('memo') as string;
+        const accountId = targetType === 'account' ? parseInt(targetId) : undefined;
+
+        // 残高を更新（自社口座の場合のみ）
+        if (accountId) {
+            await updateCollection('accounts', items =>
+                items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + amount } : a)
+            );
+        }
 
         // 口座取引に追加
-        updateCollection('accountTransactions', items => [...items, {
-            id: genId(items),
+        const newTransactionId = genId(db.accountTransactions || []);
+        await updateCollection('accountTransactions', items => [...items, {
+            id: newTransactionId,
             type: incomeType,
-            accountId: targetType === 'account' ? parseInt(targetId) : undefined,
+            accountId,
             personId: targetType === 'person' ? parseInt(targetId) : undefined,
             amount,
             date,
             memo,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            createdByUserId: user?.id,
+        }]);
+
+        // 履歴を記録
+        await updateCollection('accountTransactionHistories', items => [...items, {
+            id: genId(items),
+            accountTransactionId: newTransactionId,
+            action: 'created' as const,
+            description: '作成',
+            userId: user?.id || 1,
+            createdAt: new Date().toISOString(),
         }]);
 
         // 管理会計にも追加（自社口座の場合のみ）
@@ -351,7 +421,7 @@ function LendingContent() {
             const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
             const account = db.accounts.find(a => a.id === parseInt(targetId));
 
-            updateCollection('transactions', items => [...items, {
+            await updateCollection('transactions', items => [...items, {
                 id: genId(items),
                 type: isLoss ? 'expense' as const : 'income' as const,
                 businessId: account?.businessId || 1,
@@ -466,6 +536,250 @@ function LendingContent() {
             }
 
             await updateCollection('accountTransactions', items => items.filter(t => t.id !== id));
+        }
+    };
+
+    // アーカイブ処理（残高から除外）
+    const archiveTransaction = async (item: typeof combinedHistory[0]) => {
+        if (!confirm('この取引をアーカイブしますか？\n※アーカイブすると残高計算から除外されます')) return;
+
+        if (item.source === 'lending') {
+            const lending = db.lendings.find(l => l.id === item.originalId);
+            if (!lending) return;
+
+            // 残高を戻す（未返済の場合のみ）
+            if (!lending.returned) {
+                const balanceChange = lending.type === 'lend'
+                    ? Math.abs(lending.amount)  // 貸出のアーカイブ: 残高を戻す
+                    : -Math.abs(lending.amount); // 借入のアーカイブ: 残高を減らす
+                await updateCollection('accounts', items =>
+                    items.map(a => a.id === lending.accountId ? {
+                        ...a,
+                        balance: (a.balance || 0) + balanceChange
+                    } : a)
+                );
+            }
+
+            // アーカイブフラグを設定
+            await updateCollection('lendings', items =>
+                items.map(l => l.id === item.originalId ? {
+                    ...l,
+                    isArchived: true,
+                    lastEditedByUserId: user?.id,
+                    lastEditedAt: new Date().toISOString()
+                } : l)
+            );
+
+            // 履歴を記録
+            await updateCollection('lendingHistories', items => [...items, {
+                id: genId(items),
+                lendingId: item.originalId,
+                action: 'archived' as const,
+                description: 'アーカイブ',
+                userId: user?.id || 1,
+                createdAt: new Date().toISOString(),
+            }]);
+        } else {
+            const transaction = (db.accountTransactions || []).find(t => t.id === item.originalId);
+            if (!transaction) return;
+
+            // 残高を戻す
+            const accountId = transaction.accountId || transaction.fromAccountId;
+            if (accountId) {
+                let balanceChange = 0;
+                if (transaction.type === 'interest' || transaction.type === 'investment_gain' || transaction.type === 'deposit') {
+                    balanceChange = -transaction.amount;
+                } else if (transaction.type === 'withdrawal') {
+                    balanceChange = transaction.amount;
+                } else if (transaction.type === 'transfer') {
+                    await updateCollection('accounts', items =>
+                        items.map(a => {
+                            if (a.id === transaction.fromAccountId) return { ...a, balance: (a.balance || 0) + transaction.amount };
+                            if (a.id === transaction.toAccountId) return { ...a, balance: (a.balance || 0) - transaction.amount };
+                            return a;
+                        })
+                    );
+                }
+
+                if (transaction.type !== 'transfer' && balanceChange !== 0) {
+                    await updateCollection('accounts', items =>
+                        items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
+                    );
+                }
+            }
+
+            // アーカイブフラグを設定
+            await updateCollection('accountTransactions', items =>
+                items.map(t => t.id === item.originalId ? {
+                    ...t,
+                    isArchived: true,
+                    lastEditedByUserId: user?.id,
+                    lastEditedAt: new Date().toISOString()
+                } : t)
+            );
+
+            // 履歴を記録
+            await updateCollection('accountTransactionHistories', items => [...items, {
+                id: genId(items),
+                accountTransactionId: item.originalId,
+                action: 'archived' as const,
+                description: 'アーカイブ',
+                userId: user?.id || 1,
+                createdAt: new Date().toISOString(),
+            }]);
+        }
+    };
+
+    // 編集保存処理
+    const handleEditSave = async (
+        source: 'lending' | 'transaction',
+        originalId: number,
+        updates: Partial<Lending> | Partial<AccountTransaction>,
+        changes: FieldChange[]
+    ) => {
+        if (changes.length === 0) return;
+
+        const description = changes.map(c =>
+            `${c.displayName}を${c.oldValue || '(なし)'}→${c.newValue || '(なし)'}に変更`
+        ).join('、');
+
+        if (source === 'lending') {
+            const oldLending = db.lendings.find(l => l.id === originalId);
+            if (!oldLending) return;
+
+            const lendingUpdates = updates as Partial<Lending>;
+
+            // 旧レコードの影響を取り消す（残高を戻す）
+            if (!oldLending.returned) {
+                const oldBalanceChange = oldLending.type === 'lend'
+                    ? Math.abs(oldLending.amount)
+                    : -Math.abs(oldLending.amount);
+                await updateCollection('accounts', items =>
+                    items.map(a => a.id === oldLending.accountId ? {
+                        ...a,
+                        balance: (a.balance || 0) + oldBalanceChange
+                    } : a)
+                );
+            }
+
+            // 新しい値で残高を適用
+            const newAccountId = lendingUpdates.accountId || oldLending.accountId;
+            const newType = lendingUpdates.type || oldLending.type;
+            const newAmount = lendingUpdates.amount !== undefined ? lendingUpdates.amount : oldLending.amount;
+            if (!oldLending.returned) {
+                const newBalanceChange = newType === 'lend'
+                    ? -Math.abs(newAmount)
+                    : Math.abs(newAmount);
+                await updateCollection('accounts', items =>
+                    items.map(a => a.id === newAccountId ? {
+                        ...a,
+                        balance: (a.balance || 0) + newBalanceChange
+                    } : a)
+                );
+            }
+
+            // レコードを更新
+            await updateCollection('lendings', items =>
+                items.map(l => l.id === originalId ? {
+                    ...l,
+                    ...lendingUpdates,
+                    lastEditedByUserId: user?.id,
+                    lastEditedAt: new Date().toISOString()
+                } : l)
+            );
+
+            // 履歴を記録
+            await updateCollection('lendingHistories', items => [...items, {
+                id: genId(items),
+                lendingId: originalId,
+                action: 'updated' as const,
+                description,
+                changes: JSON.stringify(changes),
+                userId: user?.id || 1,
+                createdAt: new Date().toISOString(),
+            }]);
+        } else {
+            const oldTransaction = (db.accountTransactions || []).find(t => t.id === originalId);
+            if (!oldTransaction) return;
+
+            const transactionUpdates = updates as Partial<AccountTransaction>;
+
+            // 旧レコードの影響を取り消す
+            const oldAccountId = oldTransaction.accountId || oldTransaction.fromAccountId;
+            if (oldAccountId) {
+                if (oldTransaction.type === 'transfer') {
+                    await updateCollection('accounts', items =>
+                        items.map(a => {
+                            if (a.id === oldTransaction.fromAccountId) return { ...a, balance: (a.balance || 0) + oldTransaction.amount };
+                            if (a.id === oldTransaction.toAccountId) return { ...a, balance: (a.balance || 0) - oldTransaction.amount };
+                            return a;
+                        })
+                    );
+                } else {
+                    let balanceChange = 0;
+                    if (oldTransaction.type === 'interest' || oldTransaction.type === 'investment_gain' || oldTransaction.type === 'deposit') {
+                        balanceChange = -oldTransaction.amount;
+                    } else if (oldTransaction.type === 'withdrawal') {
+                        balanceChange = oldTransaction.amount;
+                    }
+                    if (balanceChange !== 0) {
+                        await updateCollection('accounts', items =>
+                            items.map(a => a.id === oldAccountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
+                        );
+                    }
+                }
+            }
+
+            // 新しい値で残高を適用
+            const newType = transactionUpdates.type || oldTransaction.type;
+            const newAmount = transactionUpdates.amount !== undefined ? transactionUpdates.amount : oldTransaction.amount;
+            if (newType === 'transfer') {
+                const newFromId = transactionUpdates.fromAccountId || oldTransaction.fromAccountId;
+                const newToId = transactionUpdates.toAccountId || oldTransaction.toAccountId;
+                await updateCollection('accounts', items =>
+                    items.map(a => {
+                        if (a.id === newFromId) return { ...a, balance: (a.balance || 0) - newAmount };
+                        if (a.id === newToId) return { ...a, balance: (a.balance || 0) + newAmount };
+                        return a;
+                    })
+                );
+            } else {
+                const newAccountId = transactionUpdates.accountId || oldTransaction.accountId;
+                if (newAccountId) {
+                    let balanceChange = 0;
+                    if (newType === 'interest' || newType === 'investment_gain' || newType === 'deposit') {
+                        balanceChange = newAmount;
+                    } else if (newType === 'withdrawal') {
+                        balanceChange = -newAmount;
+                    }
+                    if (balanceChange !== 0) {
+                        await updateCollection('accounts', items =>
+                            items.map(a => a.id === newAccountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
+                        );
+                    }
+                }
+            }
+
+            // レコードを更新
+            await updateCollection('accountTransactions', items =>
+                items.map(t => t.id === originalId ? {
+                    ...t,
+                    ...transactionUpdates,
+                    lastEditedByUserId: user?.id,
+                    lastEditedAt: new Date().toISOString()
+                } : t)
+            );
+
+            // 履歴を記録
+            await updateCollection('accountTransactionHistories', items => [...items, {
+                id: genId(items),
+                accountTransactionId: originalId,
+                action: 'updated' as const,
+                description,
+                changes: JSON.stringify(changes),
+                userId: user?.id || 1,
+                createdAt: new Date().toISOString(),
+            }]);
         }
     };
 
@@ -624,7 +938,7 @@ function LendingContent() {
             <div className="data-table-container">
                 {combinedHistory.length > 0 ? (
                     <table className="data-table">
-                        <thead><tr><th>日付</th><th>口座</th><th>相手/詳細</th><th>種類</th><th>金額</th><th>状態</th><th></th></tr></thead>
+                        <thead><tr><th>日付</th><th>口座</th><th>相手/詳細</th><th>種類</th><th>金額</th><th>状態</th><th>最終編集者</th><th></th></tr></thead>
                         <tbody>
                             {combinedHistory.map(item => {
                                 const account = db.accounts.find(a => a.id === item.accountId);
@@ -649,6 +963,10 @@ function LendingContent() {
                                     : item.type === 'transfer' ? 'transfer'
                                     : 'income';
 
+                                // 最終編集者を取得
+                                const lastEditorId = item.lastEditedByUserId || item.createdByUserId;
+                                const lastEditor = lastEditorId ? db.users.find(u => u.id === lastEditorId) : null;
+
                                 return (
                                     <tr key={item.id}>
                                         <td>{item.date}</td>
@@ -663,15 +981,34 @@ function LendingContent() {
                                                 item.returned ? <span className="badge badge-done">返済済</span> : <span className="badge badge-pending">未返済</span>
                                             ) : '-'}
                                         </td>
+                                        <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            {lastEditor?.name || '-'}
+                                        </td>
                                         <td className="actions-cell">
+                                            <Link href={`/lending/transaction/${item.id}`}>
+                                                <Button size="sm" variant="ghost">詳細</Button>
+                                            </Link>
+                                            <Button size="sm" variant="secondary" onClick={() => {
+                                                setEditingTransaction({
+                                                    id: item.id,
+                                                    source: item.source,
+                                                    originalId: item.originalId,
+                                                    type: item.type,
+                                                    amount: item.amount,
+                                                    date: item.date,
+                                                    memo: item.memo,
+                                                    accountId: item.accountId,
+                                                    counterpartyType: item.counterpartyType,
+                                                    counterpartyId: item.counterpartyId,
+                                                    fromAccountId: item.source === 'transaction' ? item.accountId : undefined,
+                                                    toAccountId: item.toAccountId,
+                                                    returned: item.returned,
+                                                });
+                                                setEditModalOpen(true);
+                                            }}>編集</Button>
+                                            <Button size="sm" variant="warning" onClick={() => archiveTransaction(item)}>アーカイブ</Button>
                                             {item.source === 'lending' && !item.returned && item.type !== 'return' && (
                                                 <Button size="sm" variant="success" onClick={() => markAsReturned(db.lendings.find(l => l.id === item.originalId)!)}>返済</Button>
-                                            )}
-                                            {item.source === 'lending' && (
-                                                <Button size="sm" variant="danger" onClick={() => deleteLending(item.originalId)}>削除</Button>
-                                            )}
-                                            {item.source === 'transaction' && (
-                                                <Button size="sm" variant="danger" onClick={() => deleteAccountTransaction(item.originalId)}>削除</Button>
                                             )}
                                         </td>
                                     </tr>
@@ -1050,6 +1387,19 @@ function LendingContent() {
                     <Button type="submit" block>記録する</Button>
                 </form>
             </Modal>
+
+            {/* 編集モーダル */}
+            <TransactionEditModal
+                isOpen={editModalOpen}
+                onClose={() => {
+                    setEditModalOpen(false);
+                    setEditingTransaction(null);
+                }}
+                transaction={editingTransaction}
+                accounts={db.accounts}
+                persons={db.persons}
+                onSave={handleEditSave}
+            />
         </AppLayout>
     );
 }

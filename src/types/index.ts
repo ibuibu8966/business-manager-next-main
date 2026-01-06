@@ -116,6 +116,11 @@ export interface Lending {
     returned?: boolean;
     originalId?: number;
     createdAt: string;
+    // 編集履歴追跡用
+    isArchived?: boolean;
+    createdByUserId?: number;
+    lastEditedByUserId?: number;
+    lastEditedAt?: string;
 }
 
 export interface Transaction {
@@ -197,6 +202,11 @@ export interface AccountTransaction {
     date: string;
     memo?: string;
     createdAt: string;
+    // 編集履歴追跡用
+    isArchived?: boolean;
+    createdByUserId?: number;
+    lastEditedByUserId?: number;
+    lastEditedAt?: string;
 }
 
 // 外部相手取引（純入出金）
@@ -225,6 +235,28 @@ export interface CustomerHistory {
     customerId: number;
     action: 'created' | 'updated' | 'memo' | 'tag_added' | 'tag_removed';
     description: string;
+    userId: number;
+    createdAt: string;
+}
+
+// 貸借履歴（編集追跡用）
+export interface LendingHistory {
+    id: number;
+    lendingId: number;
+    action: 'created' | 'updated' | 'archived' | 'returned';
+    description: string;
+    changes?: string; // JSON形式のフィールド変更詳細
+    userId: number;
+    createdAt: string;
+}
+
+// 口座取引履歴（編集追跡用）
+export interface AccountTransactionHistory {
+    id: number;
+    accountTransactionId: number;
+    action: 'created' | 'updated' | 'archived';
+    description: string;
+    changes?: string; // JSON形式のフィールド変更詳細
     userId: number;
     createdAt: string;
 }
@@ -299,5 +331,8 @@ export interface Database {
     courses: Course[];
     subscriptions: Subscription[];
     monthlyChecks: MonthlyCheck[];
+    // 貸借・口座取引履歴
+    lendingHistories: LendingHistory[];
+    accountTransactionHistories: AccountTransactionHistory[];
 }
 

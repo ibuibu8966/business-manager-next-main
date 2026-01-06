@@ -49,6 +49,9 @@ export const tableNames = {
   courses: 'courses',
   subscriptions: 'subscriptions',
   monthlyChecks: 'monthly_checks',
+  // 貸借・口座取引履歴
+  lendingHistories: 'lending_histories',
+  accountTransactionHistories: 'account_transaction_histories',
 } as const;
 
 // カラム名変換（camelCase → snake_case）

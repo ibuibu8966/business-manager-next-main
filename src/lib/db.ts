@@ -54,6 +54,9 @@ const DEFAULT_DB: Database = {
     courses: [],
     subscriptions: [],
     monthlyChecks: [],
+    // 貸借・口座取引履歴
+    lendingHistories: [],
+    accountTransactionHistories: [],
 };
 
 // LocalStorageからロード
