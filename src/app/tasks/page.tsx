@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
@@ -9,10 +9,12 @@ import { useDatabase, genId } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { BusinessResourceSelector } from '@/components/task/BusinessResourceSelector';
-import { Task, TaskHistory, ChecklistBlock } from '@/types';
+import { Task, TaskHistory, ChecklistBlock, RecurringTaskTemplate, RecurrencePattern } from '@/types';
+import { formatPatternLabel, patternLabels, dayOfWeekLabels } from '@/lib/recurringTaskGenerator';
 
 function TasksContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { db, updateCollection } = useDatabase();
     const { user } = useAuth();
     const [modalOpen, setModalOpen] = useState(false);
@@ -21,11 +23,32 @@ function TasksContent() {
     const [filterAssignee, setFilterAssignee] = useState<number | ''>('');
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
+    // タブ切り替え（タスク一覧 / 繰り返しタスク）
+    const [activeTab, setActiveTab] = useState<'tasks' | 'recurring'>('tasks');
+
+    // URLパラメータからタブを設定
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'recurring') {
+            setActiveTab('recurring');
+        }
+    }, [searchParams]);
+
     // 新規タスク作成用の状態
     const [selectedBusinessId, setSelectedBusinessId] = useState<number | undefined>(undefined);
     const [selectedManualId, setSelectedManualId] = useState<number | undefined>(undefined);
     const [selectedChecklistId, setSelectedChecklistId] = useState<number | undefined>(undefined);
     const [checklistBlocks, setChecklistBlocks] = useState<ChecklistBlock[] | undefined>(undefined);
+
+    // 繰り返しタスク用の状態
+    const [recurringModalOpen, setRecurringModalOpen] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<RecurringTaskTemplate | null>(null);
+    const [filterRecurringActive, setFilterRecurringActive] = useState<'all' | 'active' | 'inactive'>('all');
+    const [filterRecurringBusiness, setFilterRecurringBusiness] = useState<number | 'all'>('all');
+    const [pattern, setPattern] = useState<RecurrencePattern>('daily');
+    const [dayOfWeek, setDayOfWeek] = useState(1);
+    const [dayOfMonth, setDayOfMonth] = useState(1);
+    const [recurringBusinessId, setRecurringBusinessId] = useState<number | undefined>(undefined);
 
     if (!db) return <div>Loading...</div>;
 
@@ -277,8 +300,220 @@ function TasksContent() {
         };
     };
 
+    // ===== 繰り返しタスク関連 =====
+    // テンプレート一覧（フィルター適用）
+    let recurringTemplates = db.recurringTaskTemplates || [];
+    if (filterRecurringActive === 'active') {
+        recurringTemplates = recurringTemplates.filter(t => t.isActive);
+    } else if (filterRecurringActive === 'inactive') {
+        recurringTemplates = recurringTemplates.filter(t => !t.isActive);
+    }
+    if (filterRecurringBusiness !== 'all') {
+        recurringTemplates = recurringTemplates.filter(t => t.businessId === filterRecurringBusiness);
+    }
+
+    // 新規作成モーダルを開く
+    const openRecurringCreateModal = () => {
+        setEditingTemplate(null);
+        setPattern('daily');
+        setDayOfWeek(1);
+        setDayOfMonth(1);
+        setRecurringBusinessId(undefined);
+        setRecurringModalOpen(true);
+    };
+
+    // 編集モーダルを開く
+    const openRecurringEditModal = (template: RecurringTaskTemplate) => {
+        setEditingTemplate(template);
+        setPattern(template.pattern);
+        setDayOfWeek(template.dayOfWeek || 1);
+        setDayOfMonth(template.dayOfMonth || 1);
+        setRecurringBusinessId(template.businessId);
+        setRecurringModalOpen(true);
+    };
+
+    // 保存
+    const saveRecurringTemplate = (e: React.FormEvent) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const formData = new FormData(form);
+
+        const templateData: Partial<RecurringTaskTemplate> = {
+            title: formData.get('title') as string,
+            description: (formData.get('description') as string) || undefined,
+            businessId: recurringBusinessId,
+            assigneeId: formData.get('assigneeId') ? Number(formData.get('assigneeId')) : undefined,
+            priority: (formData.get('priority') as RecurringTaskTemplate['priority']) || 'medium',
+            pattern,
+            dayOfWeek: pattern === 'weekly' ? dayOfWeek : undefined,
+            dayOfMonth: pattern === 'monthly' ? dayOfMonth : undefined,
+            startDate: formData.get('startDate') as string,
+            endDate: (formData.get('endDate') as string) || undefined,
+            attachedChecklistId: formData.get('checklistId') ? Number(formData.get('checklistId')) : undefined,
+            isActive: true,
+            userId: user?.id || 1,
+        };
+
+        if (editingTemplate) {
+            updateCollection('recurringTaskTemplates', templates =>
+                templates.map(t => t.id === editingTemplate.id ? {
+                    ...t,
+                    ...templateData,
+                    updatedAt: new Date().toISOString()
+                } : t)
+            );
+        } else {
+            const newId = genId(db.recurringTaskTemplates);
+            const newTemplate: RecurringTaskTemplate = {
+                ...templateData as Omit<RecurringTaskTemplate, 'id' | 'createdAt'>,
+                id: newId,
+                createdAt: new Date().toISOString(),
+            } as RecurringTaskTemplate;
+            updateCollection('recurringTaskTemplates', templates => [...templates, newTemplate]);
+        }
+
+        setRecurringModalOpen(false);
+    };
+
+    // 有効/無効切替
+    const toggleRecurringActive = (template: RecurringTaskTemplate) => {
+        updateCollection('recurringTaskTemplates', templates =>
+            templates.map(t => t.id === template.id ? {
+                ...t,
+                isActive: !t.isActive,
+                updatedAt: new Date().toISOString()
+            } : t)
+        );
+    };
+
+    // 削除
+    const deleteRecurringTemplate = (template: RecurringTaskTemplate) => {
+        if (confirm(`「${template.title}」を削除しますか？`)) {
+            updateCollection('recurringTaskTemplates', templates =>
+                templates.filter(t => t.id !== template.id)
+            );
+        }
+    };
+
+    // 事業選択用チェックリスト取得
+    const getRecurringChecklists = () => {
+        if (!recurringBusinessId) return [];
+        return db.checklists.filter(c => c.businessId === recurringBusinessId && !c.isArchived);
+    };
+
     return (
         <AppLayout title="タスク管理">
+            <style jsx>{`
+                .tabs-container {
+                    display: flex;
+                    gap: 0;
+                    margin-bottom: 20px;
+                    border-bottom: 2px solid var(--border-color);
+                }
+                .tab-button {
+                    padding: 12px 24px;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    font-size: 15px;
+                    font-weight: 500;
+                    color: var(--text-secondary);
+                    position: relative;
+                    transition: color 0.2s;
+                }
+                .tab-button:hover {
+                    color: var(--text-primary);
+                }
+                .tab-button.active {
+                    color: var(--accent-primary);
+                }
+                .tab-button.active::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -2px;
+                    left: 0;
+                    right: 0;
+                    height: 2px;
+                    background: var(--accent-primary);
+                }
+                .recurring-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                    gap: 16px;
+                }
+                .recurring-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 12px;
+                    padding: 16px;
+                }
+                .recurring-card-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 12px;
+                }
+                .recurring-title {
+                    font-size: 16px;
+                    font-weight: 600;
+                    margin: 0;
+                }
+                .recurring-pattern {
+                    display: inline-block;
+                    background: var(--accent-primary);
+                    color: white;
+                    padding: 4px 10px;
+                    border-radius: 12px;
+                    font-size: 13px;
+                    margin-bottom: 12px;
+                }
+                .recurring-meta {
+                    font-size: 14px;
+                    color: var(--text-secondary);
+                    margin-bottom: 12px;
+                }
+                .recurring-meta-item {
+                    margin-right: 12px;
+                }
+                .recurring-actions {
+                    display: flex;
+                    gap: 8px;
+                    padding-top: 12px;
+                    border-top: 1px solid var(--border-color);
+                }
+                .form-section-title {
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    margin: 16px 0 8px;
+                    padding-top: 16px;
+                    border-top: 1px solid var(--border-color);
+                }
+                @media (max-width: 600px) {
+                    .recurring-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            `}</style>
+
+            {/* タブ切り替え */}
+            <div className="tabs-container">
+                <button
+                    className={`tab-button ${activeTab === 'tasks' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('tasks')}
+                >
+                    タスク一覧
+                </button>
+                <button
+                    className={`tab-button ${activeTab === 'recurring' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('recurring')}
+                >
+                    繰り返しタスク
+                </button>
+            </div>
+
+            {activeTab === 'tasks' && (
+            <>
             <div className="page-header">
                 <h3>タスク管理</h3>
                 <div className="btn-group">
@@ -577,6 +812,252 @@ function TasksContent() {
                     <Button type="submit" block>保存</Button>
                 </form>
             </Modal>
+            </>
+            )}
+
+            {/* 繰り返しタスクタブ */}
+            {activeTab === 'recurring' && (
+            <>
+            <div className="page-header">
+                <h3>繰り返しタスク</h3>
+                <div className="btn-group">
+                    <select
+                        value={filterRecurringActive}
+                        onChange={e => setFilterRecurringActive(e.target.value as 'all' | 'active' | 'inactive')}
+                    >
+                        <option value="all">全て</option>
+                        <option value="active">有効のみ</option>
+                        <option value="inactive">無効のみ</option>
+                    </select>
+                    <select
+                        value={filterRecurringBusiness === 'all' ? 'all' : filterRecurringBusiness}
+                        onChange={e => setFilterRecurringBusiness(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                    >
+                        <option value="all">全事業</option>
+                        {db.businesses.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                    </select>
+                    <Button onClick={openRecurringCreateModal}>+ 新規作成</Button>
+                </div>
+            </div>
+
+            {recurringTemplates.length === 0 ? (
+                <div className="empty-state">
+                    <div className="empty-state-icon">🔁</div>
+                    <div className="empty-state-text">繰り返しタスクがありません</div>
+                    <Button onClick={openRecurringCreateModal} style={{ marginTop: 16 }}>最初の繰り返しタスクを作成</Button>
+                </div>
+            ) : (
+                <div className="recurring-grid">
+                    {recurringTemplates.map(template => {
+                        const business = template.businessId ? db.businesses.find(b => b.id === template.businessId) : null;
+                        const assignee = template.assigneeId ? db.users.find(u => u.id === template.assigneeId) : null;
+
+                        return (
+                            <div key={template.id} className="recurring-card">
+                                <div className="recurring-card-header">
+                                    <h3 className="recurring-title">{template.title}</h3>
+                                    <span className={`badge ${template.isActive ? 'badge-active' : 'badge-secondary'}`}>
+                                        {template.isActive ? '有効' : '無効'}
+                                    </span>
+                                </div>
+
+                                <div className="recurring-pattern">
+                                    {formatPatternLabel(template)}
+                                </div>
+
+                                <div className="recurring-meta">
+                                    {business && <span className="recurring-meta-item">🏢 {business.name}</span>}
+                                    {assignee && <span className="recurring-meta-item">👤 {assignee.name}</span>}
+                                    {template.priority && (
+                                        <span className="recurring-meta-item">
+                                            優先度: {template.priority === 'high' ? '高' : template.priority === 'low' ? '低' : '中'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="recurring-meta">
+                                    <span className="recurring-meta-item">
+                                        開始: {template.startDate}
+                                    </span>
+                                    {template.endDate && (
+                                        <span className="recurring-meta-item">
+                                            終了: {template.endDate}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {template.lastGeneratedDate && (
+                                    <div className="recurring-meta">
+                                        最終生成: {template.lastGeneratedDate}
+                                    </div>
+                                )}
+
+                                <div className="recurring-actions">
+                                    <Button size="sm" variant="ghost" onClick={() => openRecurringEditModal(template)}>
+                                        編集
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant={template.isActive ? 'secondary' : 'primary'}
+                                        onClick={() => toggleRecurringActive(template)}
+                                    >
+                                        {template.isActive ? '無効化' : '有効化'}
+                                    </Button>
+                                    <Button size="sm" variant="danger" onClick={() => deleteRecurringTemplate(template)}>
+                                        削除
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* 繰り返しタスク作成・編集モーダル */}
+            <Modal
+                isOpen={recurringModalOpen}
+                onClose={() => setRecurringModalOpen(false)}
+                title={editingTemplate ? '繰り返しタスクを編集' : '繰り返しタスクを作成'}
+            >
+                <form onSubmit={saveRecurringTemplate}>
+                    <div className="form-group">
+                        <label>タイトル</label>
+                        <input
+                            name="title"
+                            defaultValue={editingTemplate?.title}
+                            placeholder="タスクのタイトル"
+                            required
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label>説明</label>
+                        <textarea
+                            name="description"
+                            defaultValue={editingTemplate?.description}
+                            placeholder="タスクの説明（任意）"
+                            rows={3}
+                        />
+                    </div>
+
+                    <div className="form-section-title">繰り返し設定</div>
+
+                    <div className="form-group">
+                        <label>パターン</label>
+                        <select
+                            value={pattern}
+                            onChange={e => setPattern(e.target.value as RecurrencePattern)}
+                        >
+                            {Object.entries(patternLabels).map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {pattern === 'weekly' && (
+                        <div className="form-group">
+                            <label>曜日</label>
+                            <select
+                                value={dayOfWeek}
+                                onChange={e => setDayOfWeek(Number(e.target.value))}
+                            >
+                                {dayOfWeekLabels.map((label, idx) => (
+                                    <option key={idx} value={idx}>{label}曜日</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {pattern === 'monthly' && (
+                        <div className="form-group">
+                            <label>日付</label>
+                            <select
+                                value={dayOfMonth}
+                                onChange={e => setDayOfMonth(Number(e.target.value))}
+                            >
+                                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                    <option key={day} value={day}>{day}日</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div className="form-group">
+                        <label>開始日</label>
+                        <input
+                            type="date"
+                            name="startDate"
+                            defaultValue={editingTemplate?.startDate || new Date().toISOString().split('T')[0]}
+                            required
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label>終了日（任意）</label>
+                        <input
+                            type="date"
+                            name="endDate"
+                            defaultValue={editingTemplate?.endDate}
+                        />
+                    </div>
+
+                    <div className="form-section-title">タスク設定</div>
+
+                    <div className="form-group">
+                        <label>事業</label>
+                        <select
+                            value={recurringBusinessId || ''}
+                            onChange={e => setRecurringBusinessId(e.target.value ? Number(e.target.value) : undefined)}
+                        >
+                            <option value="">未設定</option>
+                            {db.businesses.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label>担当者</label>
+                        <select name="assigneeId" defaultValue={editingTemplate?.assigneeId || ''}>
+                            <option value="">未設定</option>
+                            {db.users.map(u => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label>優先度</label>
+                        <select name="priority" defaultValue={editingTemplate?.priority || 'medium'}>
+                            <option value="high">高</option>
+                            <option value="medium">中</option>
+                            <option value="low">低</option>
+                        </select>
+                    </div>
+
+                    {recurringBusinessId && (
+                        <div className="form-group">
+                            <label>チェックリスト（任意）</label>
+                            <select name="checklistId" defaultValue={editingTemplate?.attachedChecklistId || ''}>
+                                <option value="">なし</option>
+                                {getRecurringChecklists().map(c => (
+                                    <option key={c.id} value={c.id}>{c.title}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div style={{ marginTop: 20 }}>
+                        <Button type="submit" block>
+                            {editingTemplate ? '更新' : '作成'}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+            </>
+            )}
         </AppLayout>
     );
 }

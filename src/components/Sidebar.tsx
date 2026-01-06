@@ -7,7 +7,6 @@ const navItems = [
     { path: '/', icon: '📊', label: 'ダッシュボード' },
     { path: '/kpi', icon: '🎯', label: 'KPI達成率' },
     { path: '/tasks', icon: '✅', label: 'タスク管理' },
-    { path: '/recurring-tasks', icon: '🔁', label: '繰り返しタスク' },
     { path: '/tickets', icon: '🎫', label: 'チケット管理' },
     { path: '/customers', icon: '👥', label: '顧客・対応履歴' },
     { path: '/lending', icon: '💰', label: '貸借・口座管理' },
