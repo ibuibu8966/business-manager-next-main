@@ -359,9 +359,12 @@ function TasksContent() {
                                     type="text"
                                     placeholder="メモを追加... (Enter で送信)"
                                     onKeyDown={e => {
-                                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                            addMemoToTask(task.id, e.currentTarget.value.trim());
-                                            e.currentTarget.value = '';
+                                        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                                            e.preventDefault();
+                                            if (e.currentTarget.value.trim()) {
+                                                addMemoToTask(task.id, e.currentTarget.value.trim());
+                                                e.currentTarget.value = '';
+                                            }
                                         }
                                     }}
                                     style={{

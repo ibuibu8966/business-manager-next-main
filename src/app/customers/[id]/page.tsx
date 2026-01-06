@@ -552,7 +552,7 @@ function CustomerDetailContent() {
                             onChange={e => setNewTagInput(e.target.value)}
                             placeholder="新しいタグ名"
                             onKeyDown={e => {
-                                if (e.key === 'Enter') {
+                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                     e.preventDefault();
                                     if (newTagInput.trim()) {
                                         addTag(newTagInput.trim());

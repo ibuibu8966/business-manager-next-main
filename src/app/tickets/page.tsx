@@ -282,9 +282,12 @@ function TicketsContent() {
                                             type="text"
                                             placeholder="メモを追加... (Enter)"
                                             onKeyDown={e => {
-                                                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                                    addMemoToTicket(ticket.id, e.currentTarget.value.trim());
-                                                    e.currentTarget.value = '';
+                                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                                                    e.preventDefault();
+                                                    if (e.currentTarget.value.trim()) {
+                                                        addMemoToTicket(ticket.id, e.currentTarget.value.trim());
+                                                        e.currentTarget.value = '';
+                                                    }
                                                 }
                                             }}
                                             style={{

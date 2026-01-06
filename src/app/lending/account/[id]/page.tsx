@@ -603,7 +603,7 @@ function AccountDetailContent() {
                             value={newTag}
                             onChange={e => setNewTag(e.target.value)}
                             placeholder="タグ名を入力"
-                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                            onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && (e.preventDefault(), addTag())}
                         />
                         <Button onClick={addTag}>追加</Button>
                     </div>

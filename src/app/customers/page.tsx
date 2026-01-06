@@ -1022,7 +1022,7 @@ function CustomersContent() {
                                 onChange={e => setNewTagInput(e.target.value)}
                                 placeholder="タグ名を入力"
                                 onKeyDown={e => {
-                                    if (e.key === 'Enter') {
+                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                         e.preventDefault();
                                         if (newTagInput.trim() && !newCustomerTags.includes(newTagInput.trim())) {
                                             setNewCustomerTags(prev => [...prev, newTagInput.trim()]);

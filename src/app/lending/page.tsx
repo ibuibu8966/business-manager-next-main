@@ -684,7 +684,7 @@ function LendingContent() {
                                 onChange={e => setNewTagInput(e.target.value)}
                                 placeholder="タグ名を入力"
                                 onKeyDown={e => {
-                                    if (e.key === 'Enter') {
+                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                         e.preventDefault();
                                         if (newTagInput.trim() && !newAccountTags.includes(newTagInput.trim())) {
                                             setNewAccountTags([...newAccountTags, newTagInput.trim()]);
@@ -777,7 +777,7 @@ function LendingContent() {
                                 onChange={e => setNewPersonTagInput(e.target.value)}
                                 placeholder="タグ名を入力"
                                 onKeyDown={e => {
-                                    if (e.key === 'Enter') {
+                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                         e.preventDefault();
                                         if (newPersonTagInput.trim() && !newPersonTags.includes(newPersonTagInput.trim())) {
                                             setNewPersonTags([...newPersonTags, newPersonTagInput.trim()]);
