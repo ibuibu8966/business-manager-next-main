@@ -530,7 +530,7 @@ function AccountDetailContent() {
                 </form>
             </Modal>
 
-            {/* 利息/運用益モーダル */}
+            {/* 利息/運用損益モーダル */}
             <Modal
                 isOpen={incomeModalOpen}
                 onClose={() => setIncomeModalOpen(false)}

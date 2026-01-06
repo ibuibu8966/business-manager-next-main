@@ -480,7 +480,7 @@ function LendingContent() {
                     </Link>
                     <Button variant="ghost" onClick={() => setModalType('tag')}>🏷️ タグ追加</Button>
                     <Button variant="ghost" onClick={() => setModalType('transfer')}>🔄 振替</Button>
-                    <Button variant="ghost" onClick={() => setModalType('income')}>💹 利息/運用益</Button>
+                    <Button variant="ghost" onClick={() => setModalType('income')}>💹 利息/運用損益</Button>
                     <Button variant="ghost" onClick={() => setModalType('account')}>+ 社内口座</Button>
                     <Button variant="secondary" onClick={() => setModalType('person')}>+ 外部相手</Button>
                     <Button onClick={() => setModalType('lending')}>+ 貸し借り</Button>
@@ -656,7 +656,7 @@ function LendingContent() {
                                         <td>{detailText}</td>
                                         <td><span className={`lending-type ${typeClass}`}>{item.displayType}</span></td>
                                         <td className={item.amount >= 0 ? 'amount-positive' : 'amount-negative'}>
-                                            ¥{Math.abs(item.amount).toLocaleString()}
+                                            {item.amount >= 0 ? '' : '-'}¥{Math.abs(item.amount).toLocaleString()}
                                         </td>
                                         <td>
                                             {item.source === 'lending' ? (
@@ -1006,7 +1006,7 @@ function LendingContent() {
                 </form>
             </Modal>
 
-            {/* 利息/運用益モーダル */}
+            {/* 利息/運用損益モーダル */}
             <Modal isOpen={modalType === 'income'} onClose={() => setModalType(null)} title="利息・運用益を記録">
                 <form onSubmit={saveIncome}>
                     <div className="form-group">
