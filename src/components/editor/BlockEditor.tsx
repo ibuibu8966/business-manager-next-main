@@ -54,7 +54,7 @@ const BLOCK_TYPES: { type: BlockType; label: string; icon: string }[] = [
     { type: 'callout', label: 'コールアウト', icon: 'ℹ️' },
 ];
 
-const createEmptyBlock = (type: BlockType = 'paragraph'): Block => ({
+const createEmptyBlock = (type: BlockType = 'checkbox'): Block => ({
     id: nanoid(),
     type,
     children: [{ text: '' }],
@@ -143,7 +143,7 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         ));
     }, []);
 
-    const insertBlockAfter = useCallback((afterId: string, type: BlockType = 'paragraph') => {
+    const insertBlockAfter = useCallback((afterId: string, type: BlockType = 'checkbox') => {
         const newBlock = createEmptyBlock(type);
         setBlocks(prev => {
             const index = prev.findIndex(b => b.id === afterId);
@@ -324,7 +324,9 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         }
 
         // Enter: 新しいブロックを作成
+        // IME変換確定のEnterは無視（isComposingがtrueの時）
         if (e.key === 'Enter' && !e.shiftKey) {
+            if (isComposing || e.nativeEvent.isComposing) return; // IME変換中は何もしない
             e.preventDefault();
             insertBlockAfter(block.id);
             return;
@@ -359,7 +361,7 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                 return;
             }
         }
-    }, [showSlashMenu, filteredBlockTypes, slashMenuIndex, slashMenuBlockId, updateBlockText, changeBlockType, insertBlockAfter, deleteBlock, updateBlock]);
+    }, [showSlashMenu, filteredBlockTypes, slashMenuIndex, slashMenuBlockId, updateBlockText, changeBlockType, insertBlockAfter, deleteBlock, updateBlock, isComposing]);
 
     const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>, block: Block) => {
         // IME入力中は更新しない（compositionEndで処理）
