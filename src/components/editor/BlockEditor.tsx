@@ -444,6 +444,9 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             }
         };
 
+        // IME入力中はプレースホルダーを非表示にする
+        const showPlaceholder = !text && !isComposing;
+
         const commonProps = {
             contentEditable: !readOnly && block.type !== 'divider',
             suppressContentEditableWarning: true,
@@ -454,7 +457,7 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             onFocus: () => setFocusedBlockId(block.id),
             onBlur: () => setFocusedBlockId(null),
             style: textStyle,
-            className: `block-content ${!text ? 'empty' : ''}`,
+            className: `block-content ${showPlaceholder ? 'empty' : ''}`,
             'data-placeholder': getPlaceholder(),
         };
 
@@ -486,7 +489,7 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                         <div
                             {...commonProps}
                             ref={contentRefCallback}
-                            className={`block-content ${block.checked ? 'completed' : ''} ${!text ? 'empty' : ''}`}
+                            className={`block-content ${block.checked ? 'completed' : ''} ${showPlaceholder ? 'empty' : ''}`}
                         />
                     </div>
                 );
