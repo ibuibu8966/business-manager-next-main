@@ -372,3 +372,35 @@ ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DE
 ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id);
 ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS last_edited_by_user_id INTEGER REFERENCES users(id);
 ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS last_edited_at TIMESTAMPTZ;
+
+-- =====================================================
+-- マニュアル・チェックリスト機能拡張用
+-- =====================================================
+
+-- manuals テーブルに新しいカラムを追加
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'url';
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS file_url TEXT;
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS file_path TEXT;
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS file_size INTEGER;
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
+-- checklists テーブルを新規作成
+CREATE TABLE IF NOT EXISTS checklists (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  title TEXT NOT NULL,
+  description TEXT,
+  blocks JSONB NOT NULL DEFAULT '[]',
+  is_archived BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ
+);
+
+-- RLSを有効化
+ALTER TABLE checklists ENABLE ROW LEVEL SECURITY;
+
+-- 全員に読み取り・書き込み許可（開発用）
+CREATE POLICY "Allow all" ON checklists FOR ALL USING (true);
