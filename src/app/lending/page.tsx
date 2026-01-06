@@ -549,7 +549,7 @@ function LendingContent() {
                                     borderRadius: '4px',
                                     display: 'inline-block'
                                 }}>
-                                    口座: ¥{accountBalance.toLocaleString()}
+                                    残高: ¥{accountBalance.toLocaleString()}
                                 </div>
                                 {business && (
                                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>

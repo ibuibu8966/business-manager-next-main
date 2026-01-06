@@ -259,7 +259,7 @@ function PersonDetailContent() {
                         </div>
                     </div>
                     <div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>口座残高</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>残高</div>
                         <div style={{
                             fontSize: '1.5rem',
                             fontWeight: 'bold',
