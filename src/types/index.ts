@@ -215,6 +215,8 @@ export interface AccountTransaction {
     createdByUserId?: number;
     lastEditedByUserId?: number;
     lastEditedAt?: string;
+    // 管理会計連携用
+    linkedTransactionId?: number;  // 管理会計のtransactionsとの紐付け
 }
 
 // 外部相手取引（純入出金）

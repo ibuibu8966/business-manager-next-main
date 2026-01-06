@@ -104,9 +104,13 @@ export async function generateMonthlyReportData(
 
     const getAccountLendingBalance = (accountId: number): number => {
         let balance = 0;
-        allLendings.forEach(l => {
-            if (l.accountId === accountId) balance -= l.amount;
-            if (l.counterpartyType === 'account' && l.counterpartyId === accountId) balance += l.amount;
+        allLendings.filter(l => !l.returned).forEach(l => {
+            if (l.accountId === accountId) {
+                balance += l.type === 'lend' ? Math.abs(l.amount) : -Math.abs(l.amount);
+            }
+            if (l.counterpartyType === 'account' && l.counterpartyId === accountId) {
+                balance += l.type === 'lend' ? -Math.abs(l.amount) : Math.abs(l.amount);
+            }
         });
         return balance;
     };

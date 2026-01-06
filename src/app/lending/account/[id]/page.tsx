@@ -46,24 +46,36 @@ function AccountDetailContent() {
 
     const business = account.businessId ? db.businesses.find(b => b.id === account.businessId) : null;
 
-    // この口座に関連する貸借履歴
-    const relatedLendings = db.lendings.filter(l => l.accountId === accountId);
+    // この口座に関連する貸借履歴（相手方として参照されている取引も含む）
+    const relatedLendings = db.lendings.filter(l =>
+        l.accountId === accountId ||
+        (l.counterpartyType === 'account' && l.counterpartyId === accountId)
+    );
 
     // この口座に関連する取引（移転・利息・運用益）
     const relatedTransactions = (db.accountTransactions || []).filter(
         t => t.accountId === accountId || t.fromAccountId === accountId || t.toAccountId === accountId
     );
 
-    // 貸借合計計算
-    const lendingTotal = relatedLendings
-        .filter(l => l.type === 'lend' && !l.returned)
-        .reduce((sum, l) => sum + l.amount, 0);
-    const borrowingTotal = relatedLendings
-        .filter(l => l.type === 'borrow' && !l.returned)
-        .reduce((sum, l) => sum + Math.abs(l.amount), 0);
+    // 貸借残高計算（貸借管理ページと同じロジック）
+    let lendingBalance = 0;
+    relatedLendings.filter(l => !l.returned).forEach(l => {
+        if (l.accountId === accountId) {
+            // この口座が主体の取引
+            lendingBalance += l.type === 'lend' ? Math.abs(l.amount) : -Math.abs(l.amount);
+        }
+        if (l.counterpartyType === 'account' && l.counterpartyId === accountId) {
+            // この口座が相手方の取引（口座間取引）
+            lendingBalance += l.type === 'lend' ? -Math.abs(l.amount) : Math.abs(l.amount);
+        }
+    });
 
-    // 純資産 = 残高 + 貸出中（資産） - 借入中（負債）
-    const netWorth = (account.balance || 0) + lendingTotal - borrowingTotal;
+    // 表示用に分離
+    const lendingTotal = lendingBalance > 0 ? lendingBalance : 0;
+    const borrowingTotal = lendingBalance < 0 ? Math.abs(lendingBalance) : 0;
+
+    // 純資産 = 残高 + 貸借残高
+    const netWorth = (account.balance || 0) + lendingBalance;
 
     const saveAccountInfo = (e: React.FormEvent) => {
         e.preventDefault();

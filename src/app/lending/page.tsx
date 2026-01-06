@@ -391,6 +391,12 @@ function LendingContent() {
             );
         }
 
+        // 管理会計のtransactionIdを先に生成（連携用）
+        let linkedTransactionId: number | undefined;
+        if (targetType === 'account') {
+            linkedTransactionId = genId(db.transactions || []);
+        }
+
         // 口座取引に追加
         const newTransactionId = genId(db.accountTransactions || []);
         await updateCollection('accountTransactions', items => [...items, {
@@ -403,6 +409,7 @@ function LendingContent() {
             memo,
             createdAt: new Date().toISOString(),
             createdByUserId: user?.id,
+            linkedTransactionId,
         }]);
 
         // 履歴を記録
@@ -416,13 +423,13 @@ function LendingContent() {
         }]);
 
         // 管理会計にも追加（自社口座の場合のみ）
-        if (targetType === 'account') {
+        if (targetType === 'account' && linkedTransactionId !== undefined) {
             const isLoss = amount < 0;
             const categoryName = incomeType === 'interest' ? '受取利息' : '運用損益';
             const account = db.accounts.find(a => a.id === parseInt(targetId));
 
             await updateCollection('transactions', items => [...items, {
-                id: genId(items),
+                id: linkedTransactionId,
                 type: isLoss ? 'expense' as const : 'income' as const,
                 businessId: account?.businessId || 1,
                 accountId: parseInt(targetId),
@@ -627,6 +634,13 @@ function LendingContent() {
                 userId: user?.id || 1,
                 createdAt: new Date().toISOString(),
             }]);
+
+            // 管理会計連携: linkedTransactionIdがあればtransactionsも削除
+            if (transaction.linkedTransactionId) {
+                await updateCollection('transactions', items =>
+                    items.filter(t => t.id !== transaction.linkedTransactionId)
+                );
+            }
         }
     };
 
@@ -780,6 +794,23 @@ function LendingContent() {
                 userId: user?.id || 1,
                 createdAt: new Date().toISOString(),
             }]);
+
+            // 管理会計連携: linkedTransactionIdがあればtransactionsも更新
+            if (oldTransaction.linkedTransactionId && (oldTransaction.type === 'interest' || oldTransaction.type === 'investment_gain')) {
+                const isLoss = newAmount < 0;
+                const categoryName = oldTransaction.type === 'interest' ? '受取利息' : '運用損益';
+
+                await updateCollection('transactions', items =>
+                    items.map(t => t.id === oldTransaction.linkedTransactionId ? {
+                        ...t,
+                        type: isLoss ? 'expense' as const : 'income' as const,
+                        category: categoryName,
+                        amount: Math.abs(newAmount),
+                        date: transactionUpdates.date || oldTransaction.date,
+                        memo: transactionUpdates.memo || oldTransaction.memo,
+                    } : t)
+                );
+            }
         }
     };
 

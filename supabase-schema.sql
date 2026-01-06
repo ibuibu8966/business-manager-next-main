@@ -372,6 +372,8 @@ ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DE
 ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id);
 ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS last_edited_by_user_id INTEGER REFERENCES users(id);
 ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS last_edited_at TIMESTAMPTZ;
+-- 管理会計連携用
+ALTER TABLE account_transactions ADD COLUMN IF NOT EXISTS linked_transaction_id INTEGER REFERENCES transactions(id);
 
 -- =====================================================
 -- マニュアル・チェックリスト機能拡張用

@@ -81,13 +81,21 @@ function ArchiveContent() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
                                 {archivedAccounts.map(account => {
                                     const business = account.businessId ? db.businesses.find(b => b.id === account.businessId) : null;
-                                    const relatedLendings = db.lendings.filter(l => l.accountId === account.id);
-                                    const lendingTotal = relatedLendings
-                                        .filter(l => l.type === 'lend' && !l.returned)
-                                        .reduce((sum, l) => sum + l.amount, 0);
-                                    const borrowingTotal = relatedLendings
-                                        .filter(l => l.type === 'borrow' && !l.returned)
-                                        .reduce((sum, l) => sum + l.amount, 0);
+                                    const relatedLendings = db.lendings.filter(l =>
+                                        l.accountId === account.id ||
+                                        (l.counterpartyType === 'account' && l.counterpartyId === account.id)
+                                    );
+                                    let lendingBalance = 0;
+                                    relatedLendings.filter(l => !l.returned).forEach(l => {
+                                        if (l.accountId === account.id) {
+                                            lendingBalance += l.type === 'lend' ? Math.abs(l.amount) : -Math.abs(l.amount);
+                                        }
+                                        if (l.counterpartyType === 'account' && l.counterpartyId === account.id) {
+                                            lendingBalance += l.type === 'lend' ? -Math.abs(l.amount) : Math.abs(l.amount);
+                                        }
+                                    });
+                                    const lendingTotal = lendingBalance > 0 ? lendingBalance : 0;
+                                    const borrowingTotal = lendingBalance < 0 ? Math.abs(lendingBalance) : 0;
 
                                     return (
                                         <div key={account.id} className="card" style={{ padding: '1rem', background: 'var(--bg-secondary)' }}>
