@@ -109,12 +109,19 @@ async function loadFromSupabase(): Promise<Database> {
     return loadedDb;
 }
 
+// 追加されたアイテムの戻り値型（Supabase IDを含む）
+interface InsertResult<T> {
+    localId: number;
+    supabaseId: number;
+    item: T;
+}
+
 // DatabaseContext の型定義
 interface DatabaseContextType {
     db: Database | null;
     isLoading: boolean;
     saveDb: (newDb: Database) => void;
-    updateCollection: <K extends keyof Database>(key: K, updater: (items: Database[K]) => Database[K]) => Promise<void>;
+    updateCollection: <K extends keyof Database>(key: K, updater: (items: Database[K]) => Database[K]) => Promise<InsertResult<Database[K][number]>[]>;
     useSupabase: boolean;
 }
 
@@ -174,19 +181,17 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     const updateCollection = useCallback(async <K extends keyof Database>(
         key: K,
         updater: (items: Database[K]) => Database[K]
-    ) => {
+    ): Promise<InsertResult<Database[K][number]>[]> => {
         // useRefから現在の状態を同期的に取得
         const currentDb = dbRef.current;
-        if (!currentDb) return;
+        if (!currentDb) return [];
 
         const oldItems = currentDb[key];
         const newItems = updater(oldItems);
-        const newDbResult = { ...currentDb, [key]: newItems };
+        let newDbResult = { ...currentDb, [key]: newItems };
 
-        // React状態を更新
-        setDb(newDbResult);
-        // refも即座に更新（次の呼び出しのため）
-        dbRef.current = newDbResult;
+        // 追加されたアイテムの結果を格納
+        const insertResults: InsertResult<Database[K][number]>[] = [];
 
         if (useSupabaseState && supabase) {
             const tableName = tableNames[key as keyof typeof tableNames];
@@ -215,12 +220,30 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             try {
                 // 追加
                 for (const item of addedItems) {
-                    const { id, ...rest } = item;
+                    const { id: localId, ...rest } = item;
                     const { data, error } = await supabase.from(tableName).insert(toSnakeCase(rest)).select();
                     if (error) {
                         console.error(`Supabase INSERT failed for ${tableName}:`, error);
                     } else {
                         console.log(`Supabase INSERT success for ${tableName}:`, data);
+                        // Supabaseから返されたIDでローカル状態も更新
+                        if (data && data[0]) {
+                            const supabaseId = data[0].id;
+                            const insertedItem = toCamelCase(data[0]) as Database[K][number];
+                            insertResults.push({
+                                localId,
+                                supabaseId,
+                                item: insertedItem
+                            });
+                            // ローカル状態のIDをSupabaseのIDに置き換え
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            newDbResult = {
+                                ...newDbResult,
+                                [key]: (newDbResult[key] as any[]).map(i =>
+                                    i.id === localId ? { ...i, id: supabaseId } : i
+                                )
+                            };
+                        }
                     }
                 }
 
@@ -250,6 +273,13 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         } else {
             saveToLocalStorage(newDbResult);
         }
+
+        // React状態を更新（Supabase IDで更新済みの状態）
+        setDb(newDbResult);
+        // refも即座に更新（次の呼び出しのため）
+        dbRef.current = newDbResult;
+
+        return insertResults;
     }, [useSupabaseState]);
 
     return createElement(

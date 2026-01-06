@@ -150,7 +150,7 @@ function TasksContent() {
         setChecklistBlocks(undefined);
     };
 
-    const saveTask = (e: React.FormEvent) => {
+    const saveTask = async (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -180,14 +180,13 @@ function TasksContent() {
             addHistory(editingTask.id, 'updated', 'タスクを編集');
         } else {
             const newId = genId(db.tasks);
-            updateCollection('tasks', tasks => [
+            const insertResults = await updateCollection('tasks', tasks => [
                 ...tasks,
                 { id: newId, ...taskData, createdAt: new Date().toISOString() }
             ]);
-            // タスクがSupabaseに保存されるのを待ってから履歴を追加
-            setTimeout(() => {
-                addHistory(newId, 'created', 'タスクを作成');
-            }, 100);
+            // Supabaseから返されたIDを使用（なければローカルID）
+            const actualTaskId = insertResults.length > 0 ? insertResults[0].supabaseId : newId;
+            addHistory(actualTaskId, 'created', 'タスクを作成');
         }
         setModalOpen(false);
     };
