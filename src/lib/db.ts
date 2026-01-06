@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, createContext, useContext, ReactNode, createElement } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode, createElement, useRef } from 'react';
 import { Database, Category } from '@/types';
 import { supabase, isSupabaseConfigured, tableNames, toSnakeCase, toCamelCase } from './supabase';
 
@@ -119,6 +119,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     const [db, setDb] = useState<Database | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [useSupabaseState, setUseSupabaseState] = useState(false);
+    const dbRef = useRef<Database | null>(null);
 
     useEffect(() => {
         async function load() {
@@ -134,15 +135,20 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
                     const supabaseDb = await loadFromSupabase();
                     console.log('Supabase data loaded:', supabaseDb);
                     setDb(supabaseDb);
+                    dbRef.current = supabaseDb;
                     setUseSupabaseState(true);
                 } catch (e) {
                     console.error('Supabase load/connection failed, falling back to LocalStorage', e);
-                    setDb(loadFromLocalStorage());
+                    const localDb = loadFromLocalStorage();
+                    setDb(localDb);
+                    dbRef.current = localDb;
                     setUseSupabaseState(false);
                 }
             } else {
                 console.log('Using LocalStorage (Supabase not configured)');
-                setDb(loadFromLocalStorage());
+                const localDb = loadFromLocalStorage();
+                setDb(localDb);
+                dbRef.current = localDb;
             }
             setIsLoading(false);
         }
@@ -164,26 +170,18 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         key: K,
         updater: (items: Database[K]) => Database[K]
     ) => {
-        // 関数型更新を使用して最新の状態を取得
-        let newDbResult: Database | null = null;
-        let capturedOldItems: Database[K] | null = null;
-        let capturedNewItems: Database[K] | null = null;
+        // useRefから現在の状態を同期的に取得
+        const currentDb = dbRef.current;
+        if (!currentDb) return;
 
-        setDb(currentDb => {
-            if (!currentDb) return currentDb;
+        const oldItems = currentDb[key];
+        const newItems = updater(oldItems);
+        const newDbResult = { ...currentDb, [key]: newItems };
 
-            capturedOldItems = currentDb[key];
-            capturedNewItems = updater(capturedOldItems);
-            newDbResult = { ...currentDb, [key]: capturedNewItems };
-            return newDbResult;
-        });
-
-        // setDbの更新が完了するまで少し待つ
-        await new Promise(resolve => setTimeout(resolve, 0));
-
-        if (!newDbResult || !capturedOldItems || !capturedNewItems) return;
-        const oldItems = capturedOldItems;
-        const newItems = capturedNewItems;
+        // React状態を更新
+        setDb(newDbResult);
+        // refも即座に更新（次の呼び出しのため）
+        dbRef.current = newDbResult;
 
         if (useSupabaseState && supabase) {
             const tableName = tableNames[key as keyof typeof tableNames];
