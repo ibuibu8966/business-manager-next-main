@@ -364,7 +364,7 @@ function AccountDetailContent() {
                                             : db.accounts.find(a => a.id === t.fromAccountId);
 
                                         // 金額の符号と色を決定
-                                        const isNegative = (t.type === 'transfer' && isOutgoing) || t.type === 'withdrawal';
+                                        const isNegative = (t.type === 'transfer' && isOutgoing) || t.type === 'withdrawal' || t.amount < 0;
                                         const amountColor = isNegative ? 'var(--danger)' : 'var(--success)';
                                         const amountPrefix = isNegative ? '-' : '+';
 
@@ -384,7 +384,7 @@ function AccountDetailContent() {
                                                     </span>
                                                 </td>
                                                 <td style={{ color: amountColor }}>
-                                                    {amountPrefix}¥{t.amount.toLocaleString()}
+                                                    {amountPrefix}¥{Math.abs(t.amount).toLocaleString()}
                                                 </td>
                                                 <td>
                                                     {t.type === 'transfer' && (
@@ -534,7 +534,7 @@ function AccountDetailContent() {
             <Modal
                 isOpen={incomeModalOpen}
                 onClose={() => setIncomeModalOpen(false)}
-                title={incomeType === 'interest' ? '受取利息の登録' : '運用益の登録'}
+                title={incomeType === 'interest' ? '受取利息の登録' : '運用損益の登録'}
             >
                 <form onSubmit={saveIncome}>
                     <div className="form-group">
