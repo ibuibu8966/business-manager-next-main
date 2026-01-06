@@ -30,6 +30,15 @@ export function Header({ title, onToggleSidebar }: HeaderProps) {
 
             <div className="header-actions">
                 <span id="current-date">{dateStr}</span>
+                <div className="header-user">
+                    <span>{user?.name}</span>
+                    <span className={`badge ${user?.isAdmin ? 'badge-admin' : 'badge-user'}`}>
+                        {user?.isAdmin ? '管理者' : 'スタッフ'}
+                    </span>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={logout}>
+                    ログアウト
+                </button>
             </div>
         </header>
     );

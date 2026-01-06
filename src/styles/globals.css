@@ -424,8 +424,17 @@ select {
 }
 
 .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
     color: var(--text-secondary);
     font-size: 14px;
+}
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 #page-content {

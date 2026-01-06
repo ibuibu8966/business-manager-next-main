@@ -32,18 +32,6 @@ export function AppLayout({ children, title }: AppLayoutProps) {
                     {children}
                 </div>
             </main>
-
-            <div className="sidebar-footer">
-                <div className="user-info">
-                    <span>{user?.name}</span>
-                    <span className={`badge ${user?.isAdmin ? 'badge-admin' : 'badge-user'}`}>
-                        {user?.isAdmin ? '管理者' : 'スタッフ'}
-                    </span>
-                </div>
-                <button className="btn btn-ghost btn-block" onClick={logout}>
-                    ログアウト
-                </button>
-            </div>
         </div>
     );
 }
