@@ -372,7 +372,8 @@ export interface RecurringTaskTemplate {
     // 有効期間
     startDate: string;        // 開始日（YYYY-MM-DD）
     endDate?: string;         // 終了日（YYYY-MM-DD）- 未指定なら無期限
-    // チェックリスト連携
+    // マニュアル・チェックリスト連携
+    attachedManualId?: number;
     attachedChecklistId?: number;
     // 管理用
     isActive: boolean;

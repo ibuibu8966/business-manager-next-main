@@ -166,6 +166,7 @@ export async function generateRecurringTasks(targetDate?: Date): Promise<{
                 createdAt: new Date().toISOString(),
                 recurringTemplateId: template.id,
                 generatedForDate: todayStr,
+                attachedManualId: template.attachedManualId,
                 attachedChecklistId: template.attachedChecklistId,
                 checklistBlocks: checklistBlocks,
             };

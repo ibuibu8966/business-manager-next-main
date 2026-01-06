@@ -349,6 +349,7 @@ function TasksContent() {
             dayOfMonth: pattern === 'monthly' ? dayOfMonth : undefined,
             startDate: formData.get('startDate') as string,
             endDate: (formData.get('endDate') as string) || undefined,
+            attachedManualId: formData.get('manualId') ? Number(formData.get('manualId')) : undefined,
             attachedChecklistId: formData.get('checklistId') ? Number(formData.get('checklistId')) : undefined,
             isActive: true,
             userId: user?.id || 1,
@@ -393,6 +394,12 @@ function TasksContent() {
                 templates.filter(t => t.id !== template.id)
             );
         }
+    };
+
+    // 事業選択用マニュアル取得
+    const getRecurringManuals = () => {
+        if (!recurringBusinessId) return [];
+        return db.manuals.filter(m => m.businessId === recurringBusinessId && !m.isArchived);
     };
 
     // 事業選択用チェックリスト取得
@@ -1038,6 +1045,16 @@ function TasksContent() {
                     </div>
 
                     {recurringBusinessId && (
+                        <>
+                        <div className="form-group">
+                            <label>マニュアル（任意）</label>
+                            <select name="manualId" defaultValue={editingTemplate?.attachedManualId || ''}>
+                                <option value="">なし</option>
+                                {getRecurringManuals().map(m => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                            </select>
+                        </div>
                         <div className="form-group">
                             <label>チェックリスト（任意）</label>
                             <select name="checklistId" defaultValue={editingTemplate?.attachedChecklistId || ''}>
@@ -1047,6 +1064,7 @@ function TasksContent() {
                                 ))}
                             </select>
                         </div>
+                        </>
                     )}
 
                     <div style={{ marginTop: 20 }}>
