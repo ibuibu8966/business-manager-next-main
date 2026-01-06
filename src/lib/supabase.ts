@@ -54,6 +54,8 @@ export const tableNames = {
   accountTransactionHistories: 'account_transaction_histories',
   // チェックリスト
   checklists: 'checklists',
+  // 繰り返しタスク
+  recurringTaskTemplates: 'recurring_task_templates',
 } as const;
 
 // カラム名変換（camelCase → snake_case）

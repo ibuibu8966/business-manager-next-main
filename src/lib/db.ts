@@ -59,6 +59,8 @@ const DEFAULT_DB: Database = {
     accountTransactionHistories: [],
     // チェックリスト
     checklists: [],
+    // 繰り返しタスク
+    recurringTaskTemplates: [],
 };
 
 // LocalStorageからロード

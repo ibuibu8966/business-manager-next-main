@@ -29,6 +29,9 @@ export interface Task {
     attachedManualId?: number;      // 添付マニュアルID
     attachedChecklistId?: number;   // 元チェックリストID（テンプレート参照用）
     checklistBlocks?: ChecklistBlock[];  // タスク専用チェックリスト（コピー・編集可能）
+    // 繰り返しタスク連携
+    recurringTemplateId?: number;   // 生成元テンプレートID
+    generatedForDate?: string;      // 生成対象日（重複防止用）
 }
 
 export interface Customer {
@@ -346,6 +349,39 @@ export interface InlineContent {
     link?: string;
 }
 
+// 繰り返しタスク
+export type RecurrencePattern =
+    | 'daily'                      // 毎日
+    | 'weekly'                     // 毎週（特定の曜日）
+    | 'monthly'                    // 毎月（特定の日）
+    | 'weekdays'                   // 平日（月〜金）
+    | 'weekdays_include_holidays'  // 平日（祝日含む）
+    | 'weekdays_exclude_holidays'; // 平日（祝日除く）
+
+export interface RecurringTaskTemplate {
+    id: number;
+    title: string;
+    description?: string;
+    businessId?: number;
+    assigneeId?: number;
+    priority?: 'high' | 'medium' | 'low';
+    // 繰り返し設定
+    pattern: RecurrencePattern;
+    dayOfWeek?: number;       // 0-6 (日-土) - weeklyの場合
+    dayOfMonth?: number;      // 1-31 - monthlyの場合
+    // 有効期間
+    startDate: string;        // 開始日（YYYY-MM-DD）
+    endDate?: string;         // 終了日（YYYY-MM-DD）- 未指定なら無期限
+    // チェックリスト連携
+    attachedChecklistId?: number;
+    // 管理用
+    isActive: boolean;
+    lastGeneratedDate?: string;
+    userId: number;
+    createdAt: string;
+    updatedAt?: string;
+}
+
 // Database interface
 export interface Database {
     users: User[];
@@ -380,5 +416,7 @@ export interface Database {
     accountTransactionHistories: AccountTransactionHistory[];
     // チェックリスト
     checklists: Checklist[];
+    // 繰り返しタスク
+    recurringTaskTemplates: RecurringTaskTemplate[];
 }
 
