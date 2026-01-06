@@ -11,9 +11,23 @@
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.87.1",
+    "@udecode/plate": "^48.0.5",
+    "@udecode/plate-basic-marks": "^48.0.0",
+    "@udecode/plate-block-quote": "^48.0.0",
+    "@udecode/plate-code-block": "^48.0.0",
+    "@udecode/plate-common": "^41.0.13",
+    "@udecode/plate-heading": "^48.0.0",
+    "@udecode/plate-horizontal-rule": "^48.0.0",
+    "@udecode/plate-link": "^48.0.0",
+    "@udecode/plate-list": "^48.0.0",
+    "nanoid": "^5.1.6",
     "next": "16.0.7",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "slate": "^0.120.0",
+    "slate-history": "^0.113.1",
+    "slate-react": "^0.120.0",
+    "use-debounce": "^10.0.6"
   },
   "devDependencies": {
     "@types/node": "^20",

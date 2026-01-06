@@ -52,6 +52,8 @@ export const tableNames = {
   // 貸借・口座取引履歴
   lendingHistories: 'lending_histories',
   accountTransactionHistories: 'account_transaction_histories',
+  // チェックリスト
+  checklists: 'checklists',
 } as const;
 
 // カラム名変換（camelCase → snake_case）

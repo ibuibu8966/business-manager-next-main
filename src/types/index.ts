@@ -166,8 +166,16 @@ export interface Manual {
     id: number;
     businessId: number;
     name: string;
-    content?: string;
+    type: 'pdf' | 'url';           // PDF or URL
+    content?: string;              // URL用
+    fileUrl?: string;              // PDF用（Supabase Storage URL）
+    filePath?: string;             // 削除用パス
+    fileName?: string;             // 元ファイル名
+    fileSize?: number;             // バイト数
+    description?: string;          // 説明文
+    isArchived?: boolean;          // アーカイブフラグ
     createdAt: string;
+    updatedAt?: string;
 }
 
 // タスク更新履歴
@@ -302,6 +310,36 @@ export interface MonthlyCheck {
     updatedAt?: string;
 }
 
+// チェックリスト
+export interface Checklist {
+    id: number;
+    businessId: number;
+    title: string;
+    description?: string;
+    blocks: ChecklistBlock[];
+    isArchived?: boolean;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+export interface ChecklistBlock {
+    id: string;
+    type: 'paragraph' | 'checkbox' | 'heading-one' | 'heading-two' | 'heading-three'
+        | 'bulleted-list' | 'numbered-list' | 'quote' | 'divider' | 'code-block' | 'callout';
+    checked?: boolean;
+    variant?: 'info' | 'warning' | 'error' | 'success';
+    children: InlineContent[];
+}
+
+export interface InlineContent {
+    text: string;
+    bold?: boolean;
+    italic?: boolean;
+    strikethrough?: boolean;
+    code?: boolean;
+    link?: string;
+}
+
 // Database interface
 export interface Database {
     users: User[];
@@ -334,5 +372,7 @@ export interface Database {
     // 貸借・口座取引履歴
     lendingHistories: LendingHistory[];
     accountTransactionHistories: AccountTransactionHistory[];
+    // チェックリスト
+    checklists: Checklist[];
 }
 

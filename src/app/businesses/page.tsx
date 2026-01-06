@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
 import { AppLayout } from '@/components/AppLayout';
@@ -72,32 +73,36 @@ function BusinessesContent() {
             <div className="accounts-grid">
                 {businesses.map(business => {
                     const contracts = db.contracts.filter(c => c.businessId === business.id).length;
-                    const manuals = db.manuals.filter(m => m.businessId === business.id).length;
+                    const manuals = db.manuals.filter(m => m.businessId === business.id && !m.isArchived).length;
+                    const checklists = db.checklists?.filter(c => c.businessId === business.id && !c.isArchived).length || 0;
                     const tasks = db.tasks.filter(t => t.businessId === business.id).length;
                     const income = db.transactions.filter(t => t.businessId === business.id && t.type === 'income').reduce((s, t) => s + t.amount, 0);
                     const expense = db.transactions.filter(t => t.businessId === business.id && t.type === 'expense').reduce((s, t) => s + t.amount, 0);
                     const profit = income - expense;
 
                     return (
-                        <div key={business.id} className="account-card" onClick={() => openModal(business)}>
-                            <h4>{business.name}</h4>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '12px' }}>
-                                {business.description}
-                            </p>
-                            <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                                <span>📄 契約: {contracts}</span>
-                                <span>📚 マニュアル: {manuals}</span>
-                                <span>✅ タスク: {tasks}</span>
+                        <Link key={business.id} href={`/businesses/${business.id}`} style={{ textDecoration: 'none' }}>
+                            <div className="account-card">
+                                <h4>{business.name}</h4>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '12px' }}>
+                                    {business.description}
+                                </p>
+                                <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                    <span>📄 契約: {contracts}</span>
+                                    <span>📚 マニュアル: {manuals}</span>
+                                    <span>✅ チェックリスト: {checklists}</span>
+                                    <span>📋 タスク: {tasks}</span>
+                                </div>
+                                <div style={{ marginTop: '12px', fontSize: '16px', fontWeight: 600 }} className={profit >= 0 ? 'amount-positive' : 'amount-negative'}>
+                                    利益: ¥{profit.toLocaleString()}
+                                </div>
+                                <div style={{ marginTop: '8px' }}>
+                                    <Button size="sm" variant="danger" onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteBusiness(business.id); }}>
+                                        削除
+                                    </Button>
+                                </div>
                             </div>
-                            <div style={{ marginTop: '12px', fontSize: '16px', fontWeight: 600 }} className={profit >= 0 ? 'amount-positive' : 'amount-negative'}>
-                                利益: ¥{profit.toLocaleString()}
-                            </div>
-                            <div style={{ marginTop: '8px' }}>
-                                <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); deleteBusiness(business.id); }}>
-                                    削除
-                                </Button>
-                            </div>
-                        </div>
+                        </Link>
                     );
                 })}
                 {businesses.length === 0 && (

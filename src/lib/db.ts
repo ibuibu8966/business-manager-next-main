@@ -57,6 +57,8 @@ const DEFAULT_DB: Database = {
     // 貸借・口座取引履歴
     lendingHistories: [],
     accountTransactionHistories: [],
+    // チェックリスト
+    checklists: [],
 };
 
 // LocalStorageからロード
