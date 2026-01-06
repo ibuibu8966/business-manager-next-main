@@ -152,7 +152,7 @@ function AccountDetailContent() {
 
         // 管理会計（transactions）にも追加（運用損の場合はexpense）
         const isLoss = amount < 0;
-        const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
+        const categoryName = incomeType === 'interest' ? '受取利息' : '運用損益';
         await updateCollection('transactions', items => [
             ...items,
             {
@@ -243,7 +243,7 @@ function AccountDetailContent() {
         switch (type) {
             case 'transfer': return '振替';
             case 'interest': return '受取利息';
-            case 'investment_gain': return '運用益';
+            case 'investment_gain': return '運用損益';
             case 'deposit': return '純入金';
             case 'withdrawal': return '純出金';
             default: return type;
@@ -331,7 +331,7 @@ function AccountDetailContent() {
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <Button onClick={() => setTransferModalOpen(true)}>💸 振替</Button>
                 <Button onClick={() => { setIncomeType('interest'); setIncomeModalOpen(true); }}>💰 受取利息</Button>
-                <Button onClick={() => { setIncomeType('investment_gain'); setIncomeModalOpen(true); }}>📈 運用益</Button>
+                <Button onClick={() => { setIncomeType('investment_gain'); setIncomeModalOpen(true); }}>📈 運用損益</Button>
                 <Button onClick={() => setNetFlowModalOpen(true)}>💵 純入出金</Button>
             </div>
 

@@ -103,7 +103,7 @@ function TransactionDetailContent() {
         switch (transaction.type) {
             case 'transfer': return '振替';
             case 'interest': return '受取利息';
-            case 'investment_gain': return transaction.amount < 0 ? '運用損' : '運用益';
+            case 'investment_gain': return '運用損益';
             case 'deposit': return '純入金';
             case 'withdrawal': return '純出金';
             default: return transaction.type;

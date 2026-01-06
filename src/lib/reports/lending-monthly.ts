@@ -177,7 +177,7 @@ export async function generateMonthlyReportData(
         const displayTypeMap: Record<string, string> = {
             transfer: '振替',
             interest: '受取利息',
-            investment_gain: t.amount < 0 ? '運用損' : '運用益',
+            investment_gain: '運用損益',
             deposit: '純入金',
             withdrawal: '純出金',
         };

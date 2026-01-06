@@ -62,6 +62,40 @@ const createEmptyBlock = (type: BlockType = 'paragraph'): Block => ({
     ...(type === 'callout' ? { variant: 'info' as const } : {}),
 });
 
+// カーソルを末尾に移動するユーティリティ関数
+const setCaretToEnd = (el: HTMLElement) => {
+    const range = document.createRange();
+    const sel = window.getSelection();
+    if (!sel) return;
+
+    // テキストノードがある場合はその末尾に、なければ要素の末尾に
+    if (el.childNodes.length > 0) {
+        const lastChild = el.childNodes[el.childNodes.length - 1];
+        if (lastChild.nodeType === Node.TEXT_NODE) {
+            range.setStart(lastChild, lastChild.textContent?.length || 0);
+            range.setEnd(lastChild, lastChild.textContent?.length || 0);
+        } else {
+            range.selectNodeContents(el);
+            range.collapse(false);
+        }
+    } else {
+        range.selectNodeContents(el);
+        range.collapse(false);
+    }
+
+    sel.removeAllRanges();
+    sel.addRange(range);
+    el.focus();
+};
+
+// カーソルが行頭にあるかチェック
+const isCaretAtStart = (): boolean => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    return range.startOffset === 0 && range.collapsed;
+};
+
 export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockEditorProps) {
     const [blocks, setBlocks] = useState<Block[]>(
         initialValue?.length ? initialValue : [createEmptyBlock()]
@@ -71,6 +105,11 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
     const [slashMenuIndex, setSlashMenuIndex] = useState(0);
     const [slashMenuBlockId, setSlashMenuBlockId] = useState<string | null>(null);
     const [slashFilter, setSlashFilter] = useState('');
+
+    // 複数選択用の状態
+    const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
     const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
     // フィルタされたブロックタイプ
@@ -110,8 +149,10 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         setTimeout(() => {
             const el = blockRefs.current.get(newBlock.id);
             if (el) {
-                const input = el.querySelector('[contenteditable], input, textarea') as HTMLElement;
-                input?.focus();
+                const input = el.querySelector('[contenteditable]') as HTMLElement;
+                if (input) {
+                    input.focus();
+                }
             }
         }, 0);
         return newBlock.id;
@@ -131,8 +172,10 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                 setTimeout(() => {
                     const el = blockRefs.current.get(prevBlock.id);
                     if (el) {
-                        const input = el.querySelector('[contenteditable], input, textarea') as HTMLElement;
-                        input?.focus();
+                        const input = el.querySelector('[contenteditable]') as HTMLElement;
+                        if (input) {
+                            setCaretToEnd(input);
+                        }
                     }
                 }, 0);
             }
@@ -156,10 +199,50 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         setTimeout(() => {
             const el = blockRefs.current.get(id);
             if (el) {
-                const input = el.querySelector('[contenteditable], input, textarea') as HTMLElement;
-                input?.focus();
+                const input = el.querySelector('[contenteditable]') as HTMLElement;
+                if (input) {
+                    setCaretToEnd(input);
+                }
             }
         }, 0);
+    }, []);
+
+    // 複数ブロックのタイプを一括変更
+    const changeMultipleBlockTypes = useCallback((newType: BlockType) => {
+        setBlocks(prev => prev.map(b =>
+            selectedBlockIds.has(b.id)
+                ? {
+                    ...b,
+                    type: newType,
+                    ...(newType === 'checkbox' ? { checked: false } : {}),
+                    ...(newType === 'callout' ? { variant: 'info' as const } : {}),
+                }
+                : b
+        ));
+        setSelectedBlockIds(new Set());
+    }, [selectedBlockIds]);
+
+    // 長押し開始
+    const handleLongPressStart = useCallback((blockId: string) => {
+        longPressTimerRef.current = setTimeout(() => {
+            setSelectedBlockIds(prev => {
+                const next = new Set(prev);
+                if (next.has(blockId)) {
+                    next.delete(blockId);
+                } else {
+                    next.add(blockId);
+                }
+                return next;
+            });
+        }, 500);
+    }, []);
+
+    // 長押し終了
+    const handleLongPressEnd = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
     }, []);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent, block: Block) => {
@@ -207,11 +290,13 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             return;
         }
 
-        // Backspace: 空のブロックを削除
-        if (e.key === 'Backspace' && text === '') {
-            e.preventDefault();
-            deleteBlock(block.id);
-            return;
+        // Backspace: 空のブロックを削除、または行頭で前のブロックと結合
+        if (e.key === 'Backspace') {
+            if (text === '' || (text === '' && isCaretAtStart())) {
+                e.preventDefault();
+                deleteBlock(block.id);
+                return;
+            }
         }
 
         // インライン書式（選択テキストがある場合のみ）
@@ -258,6 +343,11 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         ));
     }, []);
 
+    // 選択解除
+    const clearSelection = useCallback(() => {
+        setSelectedBlockIds(new Set());
+    }, []);
+
     const renderBlock = (block: Block, index: number) => {
         const text = block.children[0]?.text || '';
         const { bold, italic, strikethrough, code } = block.children[0] || {};
@@ -280,6 +370,21 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             handleInput(e as React.FormEvent<HTMLDivElement>, block);
         };
 
+        const getPlaceholder = () => {
+            switch (block.type) {
+                case 'heading-one': return '見出し1';
+                case 'heading-two': return '見出し2';
+                case 'heading-three': return '見出し3';
+                case 'checkbox': return 'ToDoを入力';
+                case 'bulleted-list': return 'リスト項目';
+                case 'numbered-list': return 'リスト項目';
+                case 'quote': return '引用を入力';
+                case 'code-block': return 'コードを入力';
+                case 'callout': return 'コールアウトを入力';
+                default: return "'/'でメニューを表示...";
+            }
+        };
+
         const commonProps = {
             contentEditable: !readOnly && block.type !== 'divider',
             suppressContentEditableWarning: true,
@@ -288,27 +393,22 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             onFocus: () => setFocusedBlockId(block.id),
             onBlur: () => setFocusedBlockId(null),
             style: textStyle,
-            className: 'block-content',
+            className: `block-content ${!text ? 'empty' : ''}`,
+            'data-placeholder': getPlaceholder(),
         };
 
         switch (block.type) {
             case 'heading-one':
                 return (
-                    <h1 {...commonProps}>
-                        {text || <span className="placeholder">見出し1</span>}
-                    </h1>
+                    <h1 {...commonProps}>{text}</h1>
                 );
             case 'heading-two':
                 return (
-                    <h2 {...commonProps}>
-                        {text || <span className="placeholder">見出し2</span>}
-                    </h2>
+                    <h2 {...commonProps}>{text}</h2>
                 );
             case 'heading-three':
                 return (
-                    <h3 {...commonProps}>
-                        {text || <span className="placeholder">見出し3</span>}
-                    </h3>
+                    <h3 {...commonProps}>{text}</h3>
                 );
             case 'checkbox':
                 return (
@@ -323,44 +423,34 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                         </button>
                         <div
                             {...commonProps}
-                            className={`block-content ${block.checked ? 'completed' : ''}`}
-                        >
-                            {text || <span className="placeholder">ToDoを入力</span>}
-                        </div>
+                            className={`block-content ${block.checked ? 'completed' : ''} ${!text ? 'empty' : ''}`}
+                        >{text}</div>
                     </div>
                 );
             case 'bulleted-list':
                 return (
                     <div className="list-block bulleted">
                         <span className="list-marker">•</span>
-                        <div {...commonProps}>
-                            {text || <span className="placeholder">リスト項目</span>}
-                        </div>
+                        <div {...commonProps}>{text}</div>
                     </div>
                 );
             case 'numbered-list':
                 return (
                     <div className="list-block numbered">
                         <span className="list-marker">{index + 1}.</span>
-                        <div {...commonProps}>
-                            {text || <span className="placeholder">リスト項目</span>}
-                        </div>
+                        <div {...commonProps}>{text}</div>
                     </div>
                 );
             case 'quote':
                 return (
-                    <blockquote {...commonProps}>
-                        {text || <span className="placeholder">引用を入力</span>}
-                    </blockquote>
+                    <blockquote {...commonProps}>{text}</blockquote>
                 );
             case 'divider':
                 return <hr className="block-divider" />;
             case 'code-block':
                 return (
                     <pre className="code-block">
-                        <code {...commonProps}>
-                            {text || <span className="placeholder">コードを入力</span>}
-                        </code>
+                        <code {...commonProps}>{text}</code>
                     </pre>
                 );
             case 'callout':
@@ -371,16 +461,12 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                              block.variant === 'error' ? '❌' :
                              block.variant === 'success' ? '✅' : 'ℹ️'}
                         </span>
-                        <div {...commonProps}>
-                            {text || <span className="placeholder">コールアウトを入力</span>}
-                        </div>
+                        <div {...commonProps}>{text}</div>
                     </div>
                 );
             default:
                 return (
-                    <div {...commonProps}>
-                        {text || <span className="placeholder">'/'でメニューを表示...</span>}
-                    </div>
+                    <div {...commonProps}>{text}</div>
                 );
         }
     };
@@ -394,22 +480,31 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                         if (el) blockRefs.current.set(block.id, el);
                         else blockRefs.current.delete(block.id);
                     }}
-                    className={`block-wrapper ${focusedBlockId === block.id ? 'focused' : ''}`}
+                    className={`block-wrapper ${focusedBlockId === block.id ? 'focused' : ''} ${selectedBlockIds.has(block.id) ? 'selected' : ''}`}
+                    onMouseDown={() => handleLongPressStart(block.id)}
+                    onMouseUp={handleLongPressEnd}
+                    onMouseLeave={handleLongPressEnd}
+                    onTouchStart={() => handleLongPressStart(block.id)}
+                    onTouchEnd={handleLongPressEnd}
                 >
                     {!readOnly && (
                         <div className="block-handle">
-                            <button
-                                type="button"
-                                className="block-menu-trigger"
-                                onClick={() => {
-                                    setSlashMenuBlockId(block.id);
-                                    setShowSlashMenu(true);
-                                    setSlashFilter('');
-                                    setSlashMenuIndex(0);
-                                }}
-                            >
-                                ⋮⋮
-                            </button>
+                            {selectedBlockIds.has(block.id) ? (
+                                <span className="block-selected-indicator">✓</span>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="block-menu-trigger"
+                                    onClick={() => {
+                                        setSlashMenuBlockId(block.id);
+                                        setShowSlashMenu(true);
+                                        setSlashFilter('');
+                                        setSlashMenuIndex(0);
+                                    }}
+                                >
+                                    ⋮⋮
+                                </button>
+                            )}
                         </div>
                     )}
                     {renderBlock(block, index)}
@@ -439,6 +534,33 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                     )}
                 </div>
             ))}
+
+            {/* 複数選択時のツールバー */}
+            {selectedBlockIds.size > 0 && (
+                <div className="selection-toolbar">
+                    <span className="selection-count">{selectedBlockIds.size}件選択中</span>
+                    <div className="selection-toolbar-buttons">
+                        {BLOCK_TYPES.filter(bt => bt.type !== 'divider').slice(0, 6).map(bt => (
+                            <button
+                                key={bt.type}
+                                type="button"
+                                className="selection-toolbar-btn"
+                                onClick={() => changeMultipleBlockTypes(bt.type)}
+                                title={bt.label}
+                            >
+                                {bt.icon}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        className="selection-toolbar-clear"
+                        onClick={clearSelection}
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

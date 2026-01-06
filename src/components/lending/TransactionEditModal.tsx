@@ -76,7 +76,7 @@ export function generateChangeDescription(
                     return: '返済',
                     transfer: '振替',
                     interest: '利息',
-                    investment_gain: '運用益',
+                    investment_gain: '運用損益',
                     deposit: '純入金',
                     withdrawal: '純出金',
                 };
@@ -359,7 +359,7 @@ export function TransactionEditModal({
                     required
                 >
                     <option value="interest">受取利息</option>
-                    <option value="investment_gain">運用益</option>
+                    <option value="investment_gain">運用損益</option>
                     <option value="deposit">純入金</option>
                     <option value="withdrawal">純出金</option>
                 </select>

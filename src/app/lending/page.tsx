@@ -158,7 +158,7 @@ function LendingContent() {
                 : t.type === 'interest' ? '受取利息'
                 : t.type === 'deposit' ? '純入金'
                 : t.type === 'withdrawal' ? '純出金'
-                : (t.amount < 0 ? '運用損' : '運用益'),
+                : '運用損益',
             amount: t.amount,
             accountId: t.type === 'transfer' ? t.fromAccountId : t.accountId,
             toAccountId: t.toAccountId,
@@ -418,7 +418,7 @@ function LendingContent() {
         // 管理会計にも追加（自社口座の場合のみ）
         if (targetType === 'account') {
             const isLoss = amount < 0;
-            const categoryName = incomeType === 'interest' ? '受取利息' : (isLoss ? '運用損' : '運用益');
+            const categoryName = incomeType === 'interest' ? '受取利息' : '運用損益';
             const account = db.accounts.find(a => a.id === parseInt(targetId));
 
             await updateCollection('transactions', items => [...items, {
@@ -1344,13 +1344,13 @@ function LendingContent() {
             </Modal>
 
             {/* 利息/運用損益モーダル */}
-            <Modal isOpen={modalType === 'income'} onClose={() => setModalType(null)} title="利息・運用益を記録">
+            <Modal isOpen={modalType === 'income'} onClose={() => setModalType(null)} title="利息・運用損益を記録">
                 <form onSubmit={saveIncome}>
                     <div className="form-group">
                         <label>種類</label>
                         <select name="incomeType" required>
                             <option value="interest">受取利息</option>
-                            <option value="investment_gain">運用益</option>
+                            <option value="investment_gain">運用損益</option>
                         </select>
                     </div>
                     <div className="form-group">
@@ -1382,7 +1382,7 @@ function LendingContent() {
                         <input type="text" name="memo" />
                     </div>
                     <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                        ※ 利息・運用益は管理会計に自動で反映されます
+                        ※ 利息・運用損益は管理会計に自動で反映されます
                     </p>
                     <Button type="submit" block>記録する</Button>
                 </form>

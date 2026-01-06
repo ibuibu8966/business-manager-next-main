@@ -16,7 +16,7 @@ const DEFAULT_CATEGORIES: Category[] = [
     { id: 9, type: 'expense', name: '人件費' },
     { id: 10, type: 'expense', name: 'その他経費' },
     { id: 11, type: 'income', name: '受取利息' },
-    { id: 12, type: 'income', name: '運用益' },
+    { id: 12, type: 'income', name: '運用損益' },
 ];
 
 const DEFAULT_TICKET_SOURCES = [

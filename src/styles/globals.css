@@ -1888,3 +1888,105 @@ select {
     text-align: center;
     font-size: 14px;
 }
+
+/* Block content placeholder (CSS-based) */
+.block-content.empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-muted);
+    pointer-events: none;
+    position: absolute;
+}
+
+.block-content {
+    position: relative;
+    min-height: 1.5em;
+}
+
+/* Selected block highlight */
+.block-wrapper.selected {
+    background: rgba(99, 102, 241, 0.15);
+    border-radius: var(--radius-sm);
+}
+
+.block-selected-indicator {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Selection toolbar (floating at bottom) */
+.selection-toolbar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+}
+
+.selection-count {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding-right: 12px;
+    border-right: 1px solid var(--border-color);
+}
+
+.selection-toolbar-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.selection-toolbar-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.selection-toolbar-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--primary);
+}
+
+.selection-toolbar-clear {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 16px;
+    margin-left: 8px;
+    transition: all var(--transition-fast);
+}
+
+.selection-toolbar-clear:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
