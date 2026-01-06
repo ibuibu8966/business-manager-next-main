@@ -998,15 +998,15 @@ function LendingContent() {
                                                     date: item.date,
                                                     memo: item.memo,
                                                     accountId: item.accountId,
-                                                    counterpartyType: item.counterpartyType,
-                                                    counterpartyId: item.counterpartyId,
+                                                    counterpartyType: item.source === 'lending' ? item.counterpartyType : undefined,
+                                                    counterpartyId: item.source === 'lending' ? item.counterpartyId : undefined,
                                                     fromAccountId: item.source === 'transaction' ? item.accountId : undefined,
-                                                    toAccountId: item.toAccountId,
-                                                    returned: item.returned,
+                                                    toAccountId: item.source === 'transaction' ? item.toAccountId : undefined,
+                                                    returned: item.source === 'lending' ? item.returned : undefined,
                                                 });
                                                 setEditModalOpen(true);
                                             }}>編集</Button>
-                                            <Button size="sm" variant="warning" onClick={() => archiveTransaction(item)}>アーカイブ</Button>
+                                            <Button size="sm" variant="secondary" onClick={() => archiveTransaction(item)}>アーカイブ</Button>
                                             {item.source === 'lending' && !item.returned && item.type !== 'return' && (
                                                 <Button size="sm" variant="success" onClick={() => markAsReturned(db.lendings.find(l => l.id === item.originalId)!)}>返済</Button>
                                             )}

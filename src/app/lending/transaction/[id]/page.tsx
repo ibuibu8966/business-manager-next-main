@@ -381,7 +381,7 @@ function TransactionDetailContent() {
                 {!isArchived && (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <Button variant="secondary" onClick={() => setEditModalOpen(true)}>編集</Button>
-                        <Button variant="warning" onClick={handleArchive}>アーカイブ</Button>
+                        <Button variant="danger" onClick={handleArchive}>アーカイブ</Button>
                     </div>
                 )}
             </div>
