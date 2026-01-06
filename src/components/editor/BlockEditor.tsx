@@ -106,11 +106,18 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
     const [slashMenuBlockId, setSlashMenuBlockId] = useState<string | null>(null);
     const [slashFilter, setSlashFilter] = useState('');
 
+    // IME composition状態
+    const [isComposing, setIsComposing] = useState(false);
+
     // 複数選択用の状態
     const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    // 各ブロックのcontentEditable要素への参照
+    const contentRefs = useRef<Map<string, HTMLElement>>(new Map());
+    // 初期化済みブロックIDを追跡
+    const initializedBlockIds = useRef<Set<string>>(new Set());
 
     // フィルタされたブロックタイプ
     const filteredBlockTypes = useMemo(() => {
@@ -162,7 +169,14 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         setBlocks(prev => {
             if (prev.length <= 1) {
                 // 最後のブロックは削除せず、空にする
-                return prev.map(b => b.id === id ? createEmptyBlock() : b);
+                const newBlock = createEmptyBlock();
+                // DOMもクリア
+                const contentEl = contentRefs.current.get(id);
+                if (contentEl) {
+                    contentEl.textContent = '';
+                }
+                initializedBlockIds.current.delete(id);
+                return [newBlock];
             }
             const index = prev.findIndex(b => b.id === id);
             const newBlocks = prev.filter(b => b.id !== id);
@@ -179,6 +193,9 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                     }
                 }, 0);
             }
+            // 削除されたブロックの初期化フラグをクリア
+            initializedBlockIds.current.delete(id);
+            contentRefs.current.delete(id);
             return newBlocks;
         });
     }, []);
@@ -245,8 +262,32 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         }
     }, []);
 
+    // IME composition開始
+    const handleCompositionStart = useCallback(() => {
+        setIsComposing(true);
+    }, []);
+
+    // IME composition終了
+    const handleCompositionEnd = useCallback((e: React.CompositionEvent, block: Block) => {
+        setIsComposing(false);
+        const text = (e.currentTarget as HTMLElement).textContent || '';
+        updateBlockText(block.id, text);
+
+        // スラッシュコマンド検出
+        if (text.startsWith('/')) {
+            setShowSlashMenu(true);
+            setSlashMenuBlockId(block.id);
+            setSlashFilter(text.slice(1));
+            setSlashMenuIndex(0);
+        } else {
+            setShowSlashMenu(false);
+            setSlashFilter('');
+        }
+    }, [updateBlockText]);
+
     const handleKeyDown = useCallback((e: React.KeyboardEvent, block: Block) => {
-        const text = block.children[0]?.text || '';
+        const currentEl = e.currentTarget as HTMLElement;
+        const text = currentEl.textContent || '';
 
         // スラッシュメニュー表示中
         if (showSlashMenu) {
@@ -265,6 +306,10 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                 const selectedType = filteredBlockTypes[slashMenuIndex];
                 if (selectedType && slashMenuBlockId) {
                     // スラッシュとフィルタテキストを削除
+                    const contentEl = contentRefs.current.get(slashMenuBlockId);
+                    if (contentEl) {
+                        contentEl.textContent = '';
+                    }
                     updateBlockText(slashMenuBlockId, '');
                     changeBlockType(slashMenuBlockId, selectedType.type);
                 }
@@ -281,11 +326,6 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
         // Enter: 新しいブロックを作成
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            // 区切り線の場合は次のブロックを作成するだけ
-            if (block.type === 'divider') {
-                insertBlockAfter(block.id);
-                return;
-            }
             insertBlockAfter(block.id);
             return;
         }
@@ -322,6 +362,9 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
     }, [showSlashMenu, filteredBlockTypes, slashMenuIndex, slashMenuBlockId, updateBlockText, changeBlockType, insertBlockAfter, deleteBlock, updateBlock]);
 
     const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>, block: Block) => {
+        // IME入力中は更新しない（compositionEndで処理）
+        if (isComposing) return;
+
         const text = (e.target as HTMLElement).textContent || '';
         updateBlockText(block.id, text);
 
@@ -335,7 +378,7 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             setShowSlashMenu(false);
             setSlashFilter('');
         }
-    }, [updateBlockText]);
+    }, [updateBlockText, isComposing]);
 
     const toggleCheckbox = useCallback((id: string) => {
         setBlocks(prev => prev.map(b =>
@@ -370,6 +413,10 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             handleInput(e as React.FormEvent<HTMLDivElement>, block);
         };
 
+        const handleBlockCompositionEnd = (e: React.CompositionEvent<HTMLElement>) => {
+            handleCompositionEnd(e as React.CompositionEvent<HTMLDivElement>, block);
+        };
+
         const getPlaceholder = () => {
             switch (block.type) {
                 case 'heading-one': return '見出し1';
@@ -385,11 +432,25 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             }
         };
 
+        // contentEditable要素のrefコールバック - 初期化時のみテキストをセット
+        const contentRefCallback = (el: HTMLElement | null) => {
+            if (el) {
+                contentRefs.current.set(block.id, el);
+                // 初期化されていない場合のみテキストをセット
+                if (!initializedBlockIds.current.has(block.id)) {
+                    el.textContent = text;
+                    initializedBlockIds.current.add(block.id);
+                }
+            }
+        };
+
         const commonProps = {
             contentEditable: !readOnly && block.type !== 'divider',
             suppressContentEditableWarning: true,
             onKeyDown: handleBlockKeyDown,
             onInput: handleBlockInput,
+            onCompositionStart: handleCompositionStart,
+            onCompositionEnd: handleBlockCompositionEnd,
             onFocus: () => setFocusedBlockId(block.id),
             onBlur: () => setFocusedBlockId(null),
             style: textStyle,
@@ -397,18 +458,19 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
             'data-placeholder': getPlaceholder(),
         };
 
+        // 注意: {text}を直接レンダリングしない - DOMの内容はユーザー入力に任せる
         switch (block.type) {
             case 'heading-one':
                 return (
-                    <h1 {...commonProps}>{text}</h1>
+                    <h1 {...commonProps} ref={contentRefCallback} />
                 );
             case 'heading-two':
                 return (
-                    <h2 {...commonProps}>{text}</h2>
+                    <h2 {...commonProps} ref={contentRefCallback} />
                 );
             case 'heading-three':
                 return (
-                    <h3 {...commonProps}>{text}</h3>
+                    <h3 {...commonProps} ref={contentRefCallback} />
                 );
             case 'checkbox':
                 return (
@@ -423,34 +485,35 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                         </button>
                         <div
                             {...commonProps}
+                            ref={contentRefCallback}
                             className={`block-content ${block.checked ? 'completed' : ''} ${!text ? 'empty' : ''}`}
-                        >{text}</div>
+                        />
                     </div>
                 );
             case 'bulleted-list':
                 return (
                     <div className="list-block bulleted">
                         <span className="list-marker">•</span>
-                        <div {...commonProps}>{text}</div>
+                        <div {...commonProps} ref={contentRefCallback} />
                     </div>
                 );
             case 'numbered-list':
                 return (
                     <div className="list-block numbered">
                         <span className="list-marker">{index + 1}.</span>
-                        <div {...commonProps}>{text}</div>
+                        <div {...commonProps} ref={contentRefCallback} />
                     </div>
                 );
             case 'quote':
                 return (
-                    <blockquote {...commonProps}>{text}</blockquote>
+                    <blockquote {...commonProps} ref={contentRefCallback} />
                 );
             case 'divider':
                 return <hr className="block-divider" />;
             case 'code-block':
                 return (
                     <pre className="code-block">
-                        <code {...commonProps}>{text}</code>
+                        <code {...commonProps} ref={contentRefCallback} />
                     </pre>
                 );
             case 'callout':
@@ -461,12 +524,12 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                              block.variant === 'error' ? '❌' :
                              block.variant === 'success' ? '✅' : 'ℹ️'}
                         </span>
-                        <div {...commonProps}>{text}</div>
+                        <div {...commonProps} ref={contentRefCallback} />
                     </div>
                 );
             default:
                 return (
-                    <div {...commonProps}>{text}</div>
+                    <div {...commonProps} ref={contentRefCallback} />
                 );
         }
     };
@@ -519,6 +582,10 @@ export function BlockEditor({ initialValue, onChange, readOnly = false }: BlockE
                                         type="button"
                                         className={`slash-menu-item ${i === slashMenuIndex ? 'selected' : ''}`}
                                         onClick={() => {
+                                            const contentEl = contentRefs.current.get(block.id);
+                                            if (contentEl) {
+                                                contentEl.textContent = '';
+                                            }
                                             updateBlockText(block.id, '');
                                             changeBlockType(block.id, bt.type);
                                         }}
