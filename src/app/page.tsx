@@ -213,14 +213,14 @@ function DashboardContent() {
           </div>
         </div>
 
-        <div className="stat-card">
+        <div className="stat-card" style={{ overflow: 'hidden' }}>
           <div className="stat-icon">💳</div>
-          <div className="stat-info">
-            <span className="stat-value">¥{totalAccountBalance.toLocaleString()}</span>
+          <div className="stat-info" style={{ minWidth: 0, overflow: 'hidden' }}>
+            <span className="stat-value" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>¥{totalAccountBalance.toLocaleString()}</span>
             <span className="stat-label">口座残高合計</span>
-            <div style={{ marginTop: '4px', fontSize: '11px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ color: 'var(--success)', whiteSpace: 'nowrap' }}>貸: ¥{totalLent.toLocaleString()}</span>
-              <span style={{ color: 'var(--danger)', whiteSpace: 'nowrap' }}>借: ¥{totalBorrowed.toLocaleString()}</span>
+            <div style={{ marginTop: '4px', fontSize: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--success)' }}>貸:¥{totalLent.toLocaleString()}</span>
+              <span style={{ color: 'var(--danger)' }}>借:¥{totalBorrowed.toLocaleString()}</span>
             </div>
           </div>
         </div>
