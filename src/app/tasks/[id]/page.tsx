@@ -27,6 +27,27 @@ function TaskDetailContent() {
 
     const taskId = Number(params.id);
 
+    // チェックリストの変更を保存（デバウンス）- フックは条件分岐の前に配置
+    const debouncedSaveChecklist = useDebouncedCallback((blocks: Block[]) => {
+        setIsSaving(true);
+        updateCollection('tasks', tasks =>
+            tasks.map(t => t.id === taskId ? {
+                ...t,
+                checklistBlocks: blocks as ChecklistBlock[],
+            } : t)
+        );
+        setLastSaved(new Date());
+        setTimeout(() => setIsSaving(false), 500);
+    }, 1000);
+
+    const handleChecklistChange = useCallback((blocks: Block[]) => {
+        if (!initialLoadDone.current) {
+            initialLoadDone.current = true;
+            return;
+        }
+        debouncedSaveChecklist(blocks);
+    }, [debouncedSaveChecklist]);
+
     if (!db) return <div>Loading...</div>;
 
     const task = db.tasks.find(t => t.id === taskId);
@@ -71,27 +92,6 @@ function TaskDetailContent() {
     const totalCount = checkboxBlocks.length;
     const progressPercent = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
     const allChecked = totalCount === 0 || checkedCount === totalCount;
-
-    // チェックリストの変更を保存（デバウンス）
-    const debouncedSaveChecklist = useDebouncedCallback((blocks: Block[]) => {
-        setIsSaving(true);
-        updateCollection('tasks', tasks =>
-            tasks.map(t => t.id === taskId ? {
-                ...t,
-                checklistBlocks: blocks as ChecklistBlock[],
-            } : t)
-        );
-        setLastSaved(new Date());
-        setTimeout(() => setIsSaving(false), 500);
-    }, 1000);
-
-    const handleChecklistChange = useCallback((blocks: Block[]) => {
-        if (!initialLoadDone.current) {
-            initialLoadDone.current = true;
-            return;
-        }
-        debouncedSaveChecklist(blocks);
-    }, [debouncedSaveChecklist]);
 
     // ステータス変更
     const changeStatus = (newStatus: Task['status']) => {
