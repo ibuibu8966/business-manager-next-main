@@ -35,11 +35,37 @@ function LendingContent() {
         ? activePersons.filter(p => p.tags?.includes(filterTag))
         : activePersons;
 
-    // 残高計算
+    // 残高計算（貸借のみ）
     const getPersonBalance = (personId: number) => {
         return db.lendings
             .filter(l => (l.counterpartyType === 'person' && l.counterpartyId === personId) || (!l.counterpartyType && l.personId === personId))
             .reduce((sum, l) => sum + l.amount, 0);
+    };
+
+    // 外部相手の口座残高計算（純入出金 + 貸借）
+    const getPersonAccountBalance = (personId: number) => {
+        // 純入出金
+        const netFlowTotal = (db.personTransactions || [])
+            .filter(t => t.personId === personId)
+            .reduce((sum, t) => sum + (t.type === 'deposit' ? t.amount : -t.amount), 0);
+
+        // 貸借（全履歴、returnレコードで相殺）
+        const relatedLendings = db.lendings.filter(l =>
+            l.personId === personId ||
+            (l.counterpartyType === 'person' && l.counterpartyId === personId)
+        );
+
+        const lendingEffect = relatedLendings.reduce((sum, l) => {
+            // lend = あなたが貸した = 相手が借りた = 相手の口座に+
+            // borrow = あなたが借りた = 相手が貸した = 相手の口座から-
+            // return = 元取引の逆符号（l.amount が既に逆符号で記録されている）
+            if (l.type === 'lend') return sum + Math.abs(l.amount);
+            if (l.type === 'borrow') return sum - Math.abs(l.amount);
+            if (l.type === 'return') return sum + l.amount; // 逆符号なのでそのまま加算
+            return sum;
+        }, 0);
+
+        return netFlowTotal + lendingEffect;
     };
 
     // 口座の貸借残高を計算（未返済のみ）
@@ -501,6 +527,7 @@ function LendingContent() {
             <div className="persons-grid">
                 {filteredPersons.map(person => {
                     const balance = getPersonBalance(person.id);
+                    const accountBalance = getPersonAccountBalance(person.id);
                     const business = db.businesses.find(b => b.id === person.businessId);
                     return (
                         <Link key={person.id} href={`/lending/person/${person.id}`} style={{ textDecoration: 'none' }}>
@@ -512,6 +539,9 @@ function LendingContent() {
                                     </span>
                                 </div>
                                 <span className="person-meta">{balance > 0 ? '貸し' : balance < 0 ? '借り' : '精算済'}</span>
+                                <div style={{ fontSize: '12px', color: accountBalance >= 0 ? 'var(--primary)' : 'var(--danger)', marginTop: '4px' }}>
+                                    口座: ¥{accountBalance.toLocaleString()}
+                                </div>
                                 {business && (
                                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                         {business.name}

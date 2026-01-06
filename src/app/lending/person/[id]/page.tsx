@@ -76,6 +76,18 @@ function PersonDetailContent() {
     // 貸出中・借入中は純入金の運用先であり、追加の資産ではない
     const netWorth = netFlowTotal;
 
+    // 口座残高（純入出金 + 貸借、returnで相殺）
+    const lendingEffect = relatedLendings.reduce((sum, l) => {
+        // lend = あなたが貸した = 相手が借りた = 相手の口座に+
+        // borrow = あなたが借りた = 相手が貸した = 相手の口座から-
+        // return = 元取引の逆符号（l.amount が既に逆符号で記録されている）
+        if (l.type === 'lend') return sum + Math.abs(l.amount);
+        if (l.type === 'borrow') return sum - Math.abs(l.amount);
+        if (l.type === 'return') return sum + l.amount; // 逆符号なのでそのまま加算
+        return sum;
+    }, 0);
+    const accountBalance = netFlowTotal + lendingEffect;
+
     const savePersonInfo = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
@@ -244,6 +256,16 @@ function PersonDetailContent() {
                             color: netWorth >= 0 ? 'var(--primary)' : 'var(--danger)'
                         }}>
                             ¥{netWorth.toLocaleString()}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>口座残高</div>
+                        <div style={{
+                            fontSize: '1.5rem',
+                            fontWeight: 'bold',
+                            color: accountBalance >= 0 ? 'var(--primary)' : 'var(--danger)'
+                        }}>
+                            ¥{accountBalance.toLocaleString()}
                         </div>
                     </div>
                     <div>
