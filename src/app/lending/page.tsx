@@ -14,6 +14,7 @@ import { TransactionEditModal, CombinedTransaction, FieldChange, generateChangeD
 import { Lending, Account, Person, Tag, AccountTransaction, LendingHistory, AccountTransactionHistory } from '@/types';
 import { getPersonBalance, getPersonAccountBalance, getAccountBalance, calculatePersonTotals } from '@/lib/lending/balance';
 import { createCombinedHistory, CombinedHistoryItem } from '@/lib/lending/history';
+import { saveLendingEdit, saveTransactionEdit } from '@/lib/lending/operations';
 
 function LendingContent() {
     const { user } = useAuth();
@@ -550,173 +551,37 @@ function LendingContent() {
         }
     };
 
-    // 編集保存処理
+    // 編集保存処理（ユーティリティ関数に委譲）
     const handleEditSave = async (
         source: 'lending' | 'transaction',
         originalId: number,
         updates: Partial<Lending> | Partial<AccountTransaction>,
         changes: FieldChange[]
     ) => {
-        if (changes.length === 0) return;
-
-        const description = changes.map(c =>
-            `${c.displayName}を${c.oldValue || '(なし)'}→${c.newValue || '(なし)'}に変更`
-        ).join('、');
+        // updateCollectionの型をoperations.tsと互換性を持たせる
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updateCollectionCompat = updateCollection as any;
 
         if (source === 'lending') {
-            const oldLending = db.lendings.find(l => l.id === originalId);
-            if (!oldLending) return;
-
-            const lendingUpdates = updates as Partial<Lending>;
-
-            // 旧レコードの影響を取り消す（残高を戻す）
-            if (!oldLending.returned) {
-                const oldBalanceChange = oldLending.type === 'lend'
-                    ? Math.abs(oldLending.amount)
-                    : -Math.abs(oldLending.amount);
-                await updateCollection('accounts', items =>
-                    items.map(a => a.id === oldLending.accountId ? {
-                        ...a,
-                        balance: (a.balance || 0) + oldBalanceChange
-                    } : a)
-                );
-            }
-
-            // 新しい値で残高を適用
-            const newAccountId = lendingUpdates.accountId || oldLending.accountId;
-            const newType = lendingUpdates.type || oldLending.type;
-            const newAmount = lendingUpdates.amount !== undefined ? lendingUpdates.amount : oldLending.amount;
-            if (!oldLending.returned) {
-                const newBalanceChange = newType === 'lend'
-                    ? -Math.abs(newAmount)
-                    : Math.abs(newAmount);
-                await updateCollection('accounts', items =>
-                    items.map(a => a.id === newAccountId ? {
-                        ...a,
-                        balance: (a.balance || 0) + newBalanceChange
-                    } : a)
-                );
-            }
-
-            // レコードを更新
-            await updateCollection('lendings', items =>
-                items.map(l => l.id === originalId ? {
-                    ...l,
-                    ...lendingUpdates,
-                    lastEditedByUserId: user?.id,
-                    lastEditedAt: new Date().toISOString()
-                } : l)
+            await saveLendingEdit(
+                db,
+                updateCollectionCompat,
+                genId,
+                user?.id,
+                originalId,
+                updates as Partial<Lending>,
+                changes
             );
-
-            // 履歴を記録
-            await updateCollection('lendingHistories', items => [...items, {
-                id: genId(items),
-                lendingId: originalId,
-                action: 'updated' as const,
-                description,
-                changes: JSON.stringify(changes),
-                userId: user?.id || 1,
-                createdAt: new Date().toISOString(),
-            }]);
         } else {
-            const oldTransaction = (db.accountTransactions || []).find(t => t.id === originalId);
-            if (!oldTransaction) return;
-
-            const transactionUpdates = updates as Partial<AccountTransaction>;
-
-            // 旧レコードの影響を取り消す
-            const oldAccountId = oldTransaction.accountId || oldTransaction.fromAccountId;
-            if (oldAccountId) {
-                if (oldTransaction.type === 'transfer') {
-                    await updateCollection('accounts', items =>
-                        items.map(a => {
-                            if (a.id === oldTransaction.fromAccountId) return { ...a, balance: (a.balance || 0) + oldTransaction.amount };
-                            if (a.id === oldTransaction.toAccountId) return { ...a, balance: (a.balance || 0) - oldTransaction.amount };
-                            return a;
-                        })
-                    );
-                } else {
-                    let balanceChange = 0;
-                    if (oldTransaction.type === 'interest' || oldTransaction.type === 'investment_gain' || oldTransaction.type === 'deposit') {
-                        balanceChange = -oldTransaction.amount;
-                    } else if (oldTransaction.type === 'withdrawal') {
-                        balanceChange = oldTransaction.amount;
-                    }
-                    if (balanceChange !== 0) {
-                        await updateCollection('accounts', items =>
-                            items.map(a => a.id === oldAccountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
-                        );
-                    }
-                }
-            }
-
-            // 新しい値で残高を適用
-            const newType = transactionUpdates.type || oldTransaction.type;
-            const newAmount = transactionUpdates.amount !== undefined ? transactionUpdates.amount : oldTransaction.amount;
-            if (newType === 'transfer') {
-                const newFromId = transactionUpdates.fromAccountId || oldTransaction.fromAccountId;
-                const newToId = transactionUpdates.toAccountId || oldTransaction.toAccountId;
-                await updateCollection('accounts', items =>
-                    items.map(a => {
-                        if (a.id === newFromId) return { ...a, balance: (a.balance || 0) - newAmount };
-                        if (a.id === newToId) return { ...a, balance: (a.balance || 0) + newAmount };
-                        return a;
-                    })
-                );
-            } else {
-                const newAccountId = transactionUpdates.accountId || oldTransaction.accountId;
-                if (newAccountId) {
-                    let balanceChange = 0;
-                    if (newType === 'interest' || newType === 'investment_gain' || newType === 'deposit') {
-                        balanceChange = newAmount;
-                    } else if (newType === 'withdrawal') {
-                        balanceChange = -newAmount;
-                    }
-                    if (balanceChange !== 0) {
-                        await updateCollection('accounts', items =>
-                            items.map(a => a.id === newAccountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
-                        );
-                    }
-                }
-            }
-
-            // レコードを更新
-            await updateCollection('accountTransactions', items =>
-                items.map(t => t.id === originalId ? {
-                    ...t,
-                    ...transactionUpdates,
-                    lastEditedByUserId: user?.id,
-                    lastEditedAt: new Date().toISOString()
-                } : t)
+            await saveTransactionEdit(
+                { accountTransactions: db.accountTransactions || [], transactions: db.transactions },
+                updateCollectionCompat,
+                genId,
+                user?.id,
+                originalId,
+                updates as Partial<AccountTransaction>,
+                changes
             );
-
-            // 履歴を記録
-            await updateCollection('accountTransactionHistories', items => [...items, {
-                id: genId(items),
-                accountTransactionId: originalId,
-                action: 'updated' as const,
-                description,
-                changes: JSON.stringify(changes),
-                userId: user?.id || 1,
-                createdAt: new Date().toISOString(),
-            }]);
-
-            // 管理会計連携: linkedTransactionIdがあればtransactionsも更新
-            if (oldTransaction.linkedTransactionId && (oldTransaction.type === 'interest' || oldTransaction.type === 'investment_gain')) {
-                const isLoss = newAmount < 0;
-                const categoryName = oldTransaction.type === 'interest' ? '受取利息' : '運用損益';
-
-                await updateCollection('transactions', items =>
-                    items.map(t => t.id === oldTransaction.linkedTransactionId ? {
-                        ...t,
-                        type: isLoss ? 'expense' as const : 'income' as const,
-                        category: categoryName,
-                        amount: Math.abs(newAmount),
-                        date: transactionUpdates.date || oldTransaction.date,
-                        memo: transactionUpdates.memo || oldTransaction.memo,
-                    } : t)
-                );
-            }
         }
     };
 
