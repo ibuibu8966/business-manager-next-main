@@ -661,20 +661,28 @@ function TasksContent() {
                                     const remainingCount = checkboxItems.length - 5;
                                     return (
                                         <div
-                                            style={{ marginTop: '8px', fontSize: '12px' }}
+                                            style={{
+                                                marginTop: '12px',
+                                                padding: '8px 12px',
+                                                background: 'var(--bg-tertiary)',
+                                                borderRadius: '6px',
+                                                fontSize: '13px'
+                                            }}
                                             onClick={e => e.stopPropagation()}
                                         >
                                             {displayItems.map(item => (
-                                                <div
+                                                <label
                                                     key={item.id}
                                                     style={{
                                                         display: 'flex',
-                                                        alignItems: 'flex-start',
-                                                        gap: '6px',
-                                                        padding: '4px 0',
-                                                        cursor: 'pointer'
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        padding: '6px 0',
+                                                        cursor: 'pointer',
+                                                        borderBottom: '1px solid var(--border-color)'
                                                     }}
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
                                                         updateCollection('tasks', tasks =>
                                                             tasks.map(t => t.id === task.id ? {
                                                                 ...t,
@@ -689,20 +697,30 @@ function TasksContent() {
                                                         type="checkbox"
                                                         checked={item.checked || false}
                                                         onChange={() => {}}
-                                                        style={{ margin: '2px 0 0 0', cursor: 'pointer' }}
+                                                        style={{
+                                                            width: '16px',
+                                                            height: '16px',
+                                                            cursor: 'pointer',
+                                                            accentColor: 'var(--accent-primary)',
+                                                            flexShrink: 0
+                                                        }}
                                                     />
                                                     <span style={{
                                                         color: item.checked ? 'var(--text-muted)' : 'var(--text-primary)',
                                                         textDecoration: item.checked ? 'line-through' : 'none',
-                                                        lineHeight: '1.4'
+                                                        flex: 1
                                                     }}>
                                                         {item.children?.map(c => c.text).join('') || ''}
                                                     </span>
-                                                </div>
+                                                </label>
                                             ))}
                                             {remainingCount > 0 && (
-                                                <div style={{ color: 'var(--text-muted)', paddingLeft: '22px' }}>
-                                                    他 {remainingCount} 件
+                                                <div style={{
+                                                    color: 'var(--text-muted)',
+                                                    fontSize: '12px',
+                                                    paddingTop: '6px'
+                                                }}>
+                                                    他 {remainingCount} 件...
                                                 </div>
                                             )}
                                         </div>
