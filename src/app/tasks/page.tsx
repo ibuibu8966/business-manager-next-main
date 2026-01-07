@@ -557,6 +557,7 @@ function TasksContent() {
                                 key={task.id}
                                 className={`task-card priority-${task.priority} status-${task.status} ${isOverdue(task) ? 'overdue' : ''}`}
                                 style={isOverdue(task) ? { borderColor: 'var(--danger)', borderWidth: '2px' } : {}}
+                                onClick={() => goToTaskDetail(task.id)}
                             >
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', justifyContent: 'flex-start' }}>
                                     <span className={`badge badge-${task.status === '完了' ? 'done' : task.status === '進行中' ? 'active' : 'pending'}`}>
@@ -578,7 +579,7 @@ function TasksContent() {
                                         </span>
                                     )}
                                 </div>
-                                <div className="task-card-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px', maxWidth: '100%' }}>
+                                <div className="task-card-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px', maxWidth: '100%' }} onClick={e => e.stopPropagation()}>
                                     {task.status !== '進行中' && (
                                         <Button size="sm" variant="primary" onClick={() => changeStatus(task, '進行中')}>進行中</Button>
                                     )}
@@ -652,6 +653,61 @@ function TasksContent() {
                                         </div>
                                     </div>
                                 )}
+                                {/* チェックリスト項目表示 */}
+                                {task.checklistBlocks && task.checklistBlocks.length > 0 && (() => {
+                                    const checkboxItems = task.checklistBlocks.filter(b => b.type === 'checkbox');
+                                    if (checkboxItems.length === 0) return null;
+                                    const displayItems = checkboxItems.slice(0, 5);
+                                    const remainingCount = checkboxItems.length - 5;
+                                    return (
+                                        <div
+                                            style={{ marginTop: '8px', fontSize: '12px' }}
+                                            onClick={e => e.stopPropagation()}
+                                        >
+                                            {displayItems.map(item => (
+                                                <div
+                                                    key={item.id}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'flex-start',
+                                                        gap: '6px',
+                                                        padding: '4px 0',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={() => {
+                                                        updateCollection('tasks', tasks =>
+                                                            tasks.map(t => t.id === task.id ? {
+                                                                ...t,
+                                                                checklistBlocks: t.checklistBlocks?.map(b =>
+                                                                    b.id === item.id ? { ...b, checked: !b.checked } : b
+                                                                )
+                                                            } : t)
+                                                        );
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.checked || false}
+                                                        onChange={() => {}}
+                                                        style={{ margin: '2px 0 0 0', cursor: 'pointer' }}
+                                                    />
+                                                    <span style={{
+                                                        color: item.checked ? 'var(--text-muted)' : 'var(--text-primary)',
+                                                        textDecoration: item.checked ? 'line-through' : 'none',
+                                                        lineHeight: '1.4'
+                                                    }}>
+                                                        {item.children?.map(c => c.text).join('') || ''}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            {remainingCount > 0 && (
+                                                <div style={{ color: 'var(--text-muted)', paddingLeft: '22px' }}>
+                                                    他 {remainingCount} 件
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                                 {/* 最新メモ表示 */}
                                 {(() => {
                                     const latestMemo = getLatestMemo(task.id);
@@ -665,7 +721,7 @@ function TasksContent() {
                                     );
                                 })()}
                                 {/* メモ入力 */}
-                                <div className="task-card-memo" style={{ marginTop: '8px' }}>
+                                <div className="task-card-memo" style={{ marginTop: '8px' }} onClick={e => e.stopPropagation()}>
                                     <input
                                         type="text"
                                         placeholder="メモを追加... (Enter で送信)"

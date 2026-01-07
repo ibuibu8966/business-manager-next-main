@@ -190,10 +190,14 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
 
         const oldItems = currentDb[key];
         const newItems = updater(oldItems);
-        let newDbResult = { ...currentDb, [key]: newItems };
+        const newDbResult = { ...currentDb, [key]: newItems };
 
         // 追加されたアイテムの結果を格納
         const insertResults: InsertResult<Database[K][number]>[] = [];
+
+        // Optimistic Update: 先にUIを更新
+        setDb(newDbResult);
+        dbRef.current = newDbResult;
 
         if (useSupabaseState && supabase) {
             const tableName = tableNames[key as keyof typeof tableNames];
@@ -219,67 +223,67 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
                 return JSON.stringify(item) !== JSON.stringify(oldItem);
             });
 
-            try {
-                // 追加
-                for (const item of addedItems) {
-                    const { id: localId, ...rest } = item;
-                    const { data, error } = await supabase.from(tableName).insert(toSnakeCase(rest)).select();
-                    if (error) {
-                        console.error(`Supabase INSERT failed for ${tableName}:`, error);
-                    } else {
-                        console.log(`Supabase INSERT success for ${tableName}:`, data);
-                        // Supabaseから返されたIDでローカル状態も更新
-                        if (data && data[0]) {
-                            const supabaseId = data[0].id;
-                            const insertedItem = toCamelCase(data[0]) as Database[K][number];
-                            insertResults.push({
-                                localId,
-                                supabaseId,
-                                item: insertedItem
-                            });
-                            // ローカル状態のIDをSupabaseのIDに置き換え
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            newDbResult = {
-                                ...newDbResult,
-                                [key]: (newDbResult[key] as any[]).map(i =>
-                                    i.id === localId ? { ...i, id: supabaseId } : i
-                                )
-                            };
+            // バックグラウンドでSupabaseに保存（awaitしない）
+            (async () => {
+                try {
+                    // 追加
+                    for (const item of addedItems) {
+                        const { id: localId, ...rest } = item;
+                        const { data, error } = await supabase.from(tableName).insert(toSnakeCase(rest)).select();
+                        if (error) {
+                            console.error(`Supabase INSERT failed for ${tableName}:`, error);
+                        } else {
+                            console.log(`Supabase INSERT success for ${tableName}:`, data);
+                            // Supabaseから返されたIDでローカル状態も更新
+                            if (data && data[0]) {
+                                const supabaseId = data[0].id;
+                                const insertedItem = toCamelCase(data[0]) as Database[K][number];
+                                insertResults.push({
+                                    localId,
+                                    supabaseId,
+                                    item: insertedItem
+                                });
+                                // ローカル状態のIDをSupabaseのIDに置き換え
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const updatedDb = {
+                                    ...dbRef.current,
+                                    [key]: ((dbRef.current as Database)[key] as any[]).map(i =>
+                                        i.id === localId ? { ...i, id: supabaseId } : i
+                                    )
+                                };
+                                setDb(updatedDb as Database);
+                                dbRef.current = updatedDb as Database;
+                            }
                         }
                     }
-                }
 
-                // 削除
-                for (const item of deletedItems) {
-                    const { error } = await supabase.from(tableName).delete().eq('id', item.id);
-                    if (error) {
-                        console.error(`Supabase DELETE failed for ${tableName}:`, error);
-                    } else {
-                        console.log(`Supabase DELETE success for ${tableName}, id:`, item.id);
+                    // 削除
+                    for (const item of deletedItems) {
+                        const { error } = await supabase.from(tableName).delete().eq('id', item.id);
+                        if (error) {
+                            console.error(`Supabase DELETE failed for ${tableName}:`, error);
+                        } else {
+                            console.log(`Supabase DELETE success for ${tableName}, id:`, item.id);
+                        }
                     }
-                }
 
-                // 更新
-                for (const item of updatedItems) {
-                    const { id, ...rest } = item;
-                    const { error } = await supabase.from(tableName).update(toSnakeCase(rest)).eq('id', id);
-                    if (error) {
-                        console.error(`Supabase UPDATE failed for ${tableName}:`, error);
-                    } else {
-                        console.log(`Supabase UPDATE success for ${tableName}, id:`, id);
+                    // 更新
+                    for (const item of updatedItems) {
+                        const { id, ...rest } = item;
+                        const { error } = await supabase.from(tableName).update(toSnakeCase(rest)).eq('id', id);
+                        if (error) {
+                            console.error(`Supabase UPDATE failed for ${tableName}:`, error);
+                        } else {
+                            console.log(`Supabase UPDATE success for ${tableName}, id:`, id);
+                        }
                     }
+                } catch (e) {
+                    console.error('Supabase update failed:', e);
                 }
-            } catch (e) {
-                console.error('Supabase update failed:', e);
-            }
+            })();
         } else {
             saveToLocalStorage(newDbResult);
         }
-
-        // React状態を更新（Supabase IDで更新済みの状態）
-        setDb(newDbResult);
-        // refも即座に更新（次の呼び出しのため）
-        dbRef.current = newDbResult;
 
         return insertResults;
     }, [useSupabaseState]);
