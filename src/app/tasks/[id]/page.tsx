@@ -23,6 +23,7 @@ function TaskDetailContent() {
     const [newMemo, setNewMemo] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [manualOpen, setManualOpen] = useState(false);
     const initialLoadDone = useRef(false);
 
     const taskId = Number(params.id);
@@ -450,32 +451,41 @@ function TaskDetailContent() {
                             <div className="task-detail-section-title">
                                 <span>マニュアル</span>
                             </div>
-                            {attachedManual.type === 'url' && attachedManual.content && (
-                                <a href={attachedManual.content} target="_blank" rel="noopener noreferrer">
-                                    <Button size="sm" variant="ghost">新しいタブで開く</Button>
-                                </a>
-                            )}
-                            {attachedManual.type === 'pdf' && attachedManual.fileUrl && (
-                                <a href={attachedManual.fileUrl} target="_blank" rel="noopener noreferrer">
-                                    <Button size="sm" variant="ghost">新しいタブで開く</Button>
-                                </a>
-                            )}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <Button size="sm" variant="ghost" onClick={() => setManualOpen(!manualOpen)}>
+                                    {manualOpen ? 'マニュアルを閉じる' : 'マニュアルを開く'}
+                                </Button>
+                                {manualOpen && attachedManual.type === 'url' && attachedManual.content && (
+                                    <a href={attachedManual.content} target="_blank" rel="noopener noreferrer">
+                                        <Button size="sm" variant="ghost">新しいタブで開く</Button>
+                                    </a>
+                                )}
+                                {manualOpen && attachedManual.type === 'pdf' && attachedManual.fileUrl && (
+                                    <a href={attachedManual.fileUrl} target="_blank" rel="noopener noreferrer">
+                                        <Button size="sm" variant="ghost">新しいタブで開く</Button>
+                                    </a>
+                                )}
+                            </div>
                         </div>
-                        {attachedManual.type === 'url' && attachedManual.content ? (
-                            <div className="manual-preview">
-                                <iframe src={attachedManual.content} title={attachedManual.name} />
-                            </div>
-                        ) : attachedManual.type === 'pdf' && attachedManual.fileUrl ? (
-                            <div className="manual-preview">
-                                <iframe src={attachedManual.fileUrl} title={attachedManual.name} />
-                            </div>
-                        ) : (
-                            <div className="manual-link">
-                                <div className="manual-link-info">
-                                    <span className="manual-link-name">{attachedManual.name}</span>
-                                    <span className="manual-link-type">{attachedManual.type === 'pdf' ? 'PDF' : 'URL'}</span>
-                                </div>
-                            </div>
+                        {manualOpen && (
+                            <>
+                                {attachedManual.type === 'url' && attachedManual.content ? (
+                                    <div className="manual-preview">
+                                        <iframe src={attachedManual.content} title={attachedManual.name} />
+                                    </div>
+                                ) : attachedManual.type === 'pdf' && attachedManual.fileUrl ? (
+                                    <div className="manual-preview">
+                                        <iframe src={attachedManual.fileUrl} title={attachedManual.name} />
+                                    </div>
+                                ) : (
+                                    <div className="manual-link">
+                                        <div className="manual-link-info">
+                                            <span className="manual-link-name">{attachedManual.name}</span>
+                                            <span className="manual-link-type">{attachedManual.type === 'pdf' ? 'PDF' : 'URL'}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
