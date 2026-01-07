@@ -670,7 +670,7 @@ function TasksContent() {
                                             onClick={e => e.stopPropagation()}
                                         >
                                             {displayItems.map(item => (
-                                                <label
+                                                <div
                                                     key={item.id}
                                                     style={{
                                                         display: 'flex',
@@ -681,21 +681,22 @@ function TasksContent() {
                                                         borderBottom: '1px solid var(--border-color)'
                                                     }}
                                                     onClick={(e) => {
-                                                        e.preventDefault();
-                                                        updateCollection('tasks', tasks =>
-                                                            tasks.map(t => t.id === task.id ? {
-                                                                ...t,
-                                                                checklistBlocks: t.checklistBlocks?.map(b =>
-                                                                    b.id === item.id ? { ...b, checked: !b.checked } : b
-                                                                )
-                                                            } : t)
-                                                        );
+                                                        e.stopPropagation();
                                                     }}
                                                 >
                                                     <input
                                                         type="checkbox"
                                                         checked={item.checked || false}
-                                                        onChange={() => {}}
+                                                        onChange={() => {
+                                                            updateCollection('tasks', tasks =>
+                                                                tasks.map(t => t.id === task.id ? {
+                                                                    ...t,
+                                                                    checklistBlocks: t.checklistBlocks?.map(b =>
+                                                                        b.id === item.id ? { ...b, checked: !b.checked } : b
+                                                                    )
+                                                                } : t)
+                                                            );
+                                                        }}
                                                         style={{
                                                             width: '16px',
                                                             height: '16px',
@@ -711,7 +712,7 @@ function TasksContent() {
                                                     }}>
                                                         {item.children?.map(c => c.text).join('') || ''}
                                                     </span>
-                                                </label>
+                                                </div>
                                             ))}
                                             {remainingCount > 0 && (
                                                 <div style={{
