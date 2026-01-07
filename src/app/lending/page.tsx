@@ -13,6 +13,7 @@ import { ReportSendButton } from '@/components/admin/ReportSendButton';
 import { TransactionEditModal, CombinedTransaction, FieldChange, generateChangeDescription } from '@/components/lending/TransactionEditModal';
 import { Lending, Account, Person, Tag, AccountTransaction, LendingHistory, AccountTransactionHistory } from '@/types';
 import { getPersonBalance, getPersonAccountBalance, getAccountBalance, calculatePersonTotals } from '@/lib/lending/balance';
+import { createCombinedHistory, CombinedHistoryItem } from '@/lib/lending/history';
 
 function LendingContent() {
     const { user } = useAuth();
@@ -76,46 +77,7 @@ function LendingContent() {
     const { totalLent, totalBorrowed } = calculatePersonTotals(db.lendings, activePersons);
 
     // 統合履歴の作成（貸借 + 口座取引）- アーカイブ済みを除外
-    const combinedHistory = [
-        // 貸借履歴（アーカイブ済みを除外）
-        ...lendings.filter(l => !l.isArchived).map(l => ({
-            id: `lending-${l.id}`,
-            date: l.date,
-            type: l.type === 'return' ? 'return' : (l.amount > 0 ? 'lend' : 'borrow'),
-            displayType: l.type === 'return' ? '返済' : (l.amount > 0 ? '貸し' : '借り'),
-            amount: l.amount,
-            accountId: l.accountId,
-            counterpartyType: l.counterpartyType,
-            counterpartyId: l.counterpartyId || l.personId,
-            memo: l.memo,
-            returned: l.returned,
-            source: 'lending' as const,
-            originalId: l.id,
-            createdByUserId: l.createdByUserId,
-            lastEditedByUserId: l.lastEditedByUserId,
-            lastEditedAt: l.lastEditedAt,
-        })),
-        // 口座取引履歴（受取利息・運用益・振替）- アーカイブ済みを除外
-        ...(db.accountTransactions || []).filter(t => !t.isArchived).map(t => ({
-            id: `transaction-${t.id}`,
-            date: t.date,
-            type: t.type,
-            displayType: t.type === 'transfer' ? '振替'
-                : t.type === 'interest' ? '受取利息'
-                : t.type === 'deposit' ? '純入金'
-                : t.type === 'withdrawal' ? '純出金'
-                : '運用損益',
-            amount: t.amount,
-            accountId: t.type === 'transfer' ? t.fromAccountId : t.accountId,
-            toAccountId: t.toAccountId,
-            memo: t.memo,
-            source: 'transaction' as const,
-            originalId: t.id,
-            createdByUserId: t.createdByUserId,
-            lastEditedByUserId: t.lastEditedByUserId,
-            lastEditedAt: t.lastEditedAt,
-        }))
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const combinedHistory = createCombinedHistory(lendings, db.accountTransactions || []);
 
     const saveLending = async (e: React.FormEvent) => {
         e.preventDefault();
