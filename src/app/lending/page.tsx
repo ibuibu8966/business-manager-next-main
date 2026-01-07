@@ -14,7 +14,7 @@ import { TransactionEditModal, CombinedTransaction, FieldChange, generateChangeD
 import { Lending, Account, Person, Tag, AccountTransaction, LendingHistory, AccountTransactionHistory } from '@/types';
 import { getPersonBalance, getPersonAccountBalance, getAccountBalance, calculatePersonTotals } from '@/lib/lending/balance';
 import { createCombinedHistory, CombinedHistoryItem } from '@/lib/lending/history';
-import { saveLendingEdit, saveTransactionEdit } from '@/lib/lending/operations';
+import { saveLendingEdit, saveTransactionEdit, archiveLending, archiveAccountTransaction } from '@/lib/lending/operations';
 
 function LendingContent() {
     const { user } = useAuth();
@@ -457,97 +457,17 @@ function LendingContent() {
     const archiveTransaction = async (item: typeof combinedHistory[0]) => {
         if (!confirm('この取引をアーカイブしますか？\n※アーカイブすると残高計算から除外されます')) return;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updateCollectionCompat = updateCollection as any;
+
         if (item.source === 'lending') {
             const lending = db.lendings.find(l => l.id === item.originalId);
             if (!lending) return;
-
-            // 残高を戻す（未返済の場合のみ）
-            if (!lending.returned) {
-                const balanceChange = lending.type === 'lend'
-                    ? Math.abs(lending.amount)  // 貸出のアーカイブ: 残高を戻す
-                    : -Math.abs(lending.amount); // 借入のアーカイブ: 残高を減らす
-                await updateCollection('accounts', items =>
-                    items.map(a => a.id === lending.accountId ? {
-                        ...a,
-                        balance: (a.balance || 0) + balanceChange
-                    } : a)
-                );
-            }
-
-            // アーカイブフラグを設定
-            await updateCollection('lendings', items =>
-                items.map(l => l.id === item.originalId ? {
-                    ...l,
-                    isArchived: true,
-                    lastEditedByUserId: user?.id,
-                    lastEditedAt: new Date().toISOString()
-                } : l)
-            );
-
-            // 履歴を記録
-            await updateCollection('lendingHistories', items => [...items, {
-                id: genId(items),
-                lendingId: item.originalId,
-                action: 'archived' as const,
-                description: 'アーカイブ',
-                userId: user?.id || 1,
-                createdAt: new Date().toISOString(),
-            }]);
+            await archiveLending(lending, updateCollectionCompat, genId, user?.id);
         } else {
             const transaction = (db.accountTransactions || []).find(t => t.id === item.originalId);
             if (!transaction) return;
-
-            // 残高を戻す
-            const accountId = transaction.accountId || transaction.fromAccountId;
-            if (accountId) {
-                let balanceChange = 0;
-                if (transaction.type === 'interest' || transaction.type === 'investment_gain' || transaction.type === 'deposit') {
-                    balanceChange = -transaction.amount;
-                } else if (transaction.type === 'withdrawal') {
-                    balanceChange = transaction.amount;
-                } else if (transaction.type === 'transfer') {
-                    await updateCollection('accounts', items =>
-                        items.map(a => {
-                            if (a.id === transaction.fromAccountId) return { ...a, balance: (a.balance || 0) + transaction.amount };
-                            if (a.id === transaction.toAccountId) return { ...a, balance: (a.balance || 0) - transaction.amount };
-                            return a;
-                        })
-                    );
-                }
-
-                if (transaction.type !== 'transfer' && balanceChange !== 0) {
-                    await updateCollection('accounts', items =>
-                        items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
-                    );
-                }
-            }
-
-            // アーカイブフラグを設定
-            await updateCollection('accountTransactions', items =>
-                items.map(t => t.id === item.originalId ? {
-                    ...t,
-                    isArchived: true,
-                    lastEditedByUserId: user?.id,
-                    lastEditedAt: new Date().toISOString()
-                } : t)
-            );
-
-            // 履歴を記録
-            await updateCollection('accountTransactionHistories', items => [...items, {
-                id: genId(items),
-                accountTransactionId: item.originalId,
-                action: 'archived' as const,
-                description: 'アーカイブ',
-                userId: user?.id || 1,
-                createdAt: new Date().toISOString(),
-            }]);
-
-            // 管理会計連携: linkedTransactionIdがあればtransactionsも削除
-            if (transaction.linkedTransactionId) {
-                await updateCollection('transactions', items =>
-                    items.filter(t => t.id !== transaction.linkedTransactionId)
-                );
-            }
+            await archiveAccountTransaction(transaction, updateCollectionCompat, genId, user?.id);
         }
     };
 
