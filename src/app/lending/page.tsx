@@ -8,9 +8,11 @@ import { AppLayout } from '@/components/AppLayout';
 import { useDatabase, genId } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { TagInput } from '@/components/ui/TagInput';
 import { ReportSendButton } from '@/components/admin/ReportSendButton';
 import { TransactionEditModal, CombinedTransaction, FieldChange, generateChangeDescription } from '@/components/lending/TransactionEditModal';
 import { Lending, Account, Person, Tag, AccountTransaction, LendingHistory, AccountTransactionHistory } from '@/types';
+import { getPersonBalance, getPersonAccountBalance, getAccountBalance, calculatePersonTotals } from '@/lib/lending/balance';
 
 function LendingContent() {
     const { user } = useAuth();
@@ -19,9 +21,7 @@ function LendingContent() {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterTag, setFilterTag] = useState('');
     const [newAccountTags, setNewAccountTags] = useState<string[]>([]);
-    const [newTagInput, setNewTagInput] = useState('');
     const [newPersonTags, setNewPersonTags] = useState<string[]>([]);
-    const [newPersonTagInput, setNewPersonTagInput] = useState('');
     // 編集モーダル用
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<CombinedTransaction | null>(null);
@@ -40,69 +40,15 @@ function LendingContent() {
         ? activePersons.filter(p => p.tags?.includes(filterTag))
         : activePersons;
 
-    // 残高計算（貸借のみ、未返済分）
-    const getPersonBalance = (personId: number) => {
-        return db.lendings
-            .filter(l =>
-                ((l.counterpartyType === 'person' && l.counterpartyId === personId) ||
-                 (!l.counterpartyType && l.personId === personId)) &&
-                !l.returned
-            )
-            .reduce((sum, l) => sum + l.amount, 0);
-    };
+    // 残高計算ヘルパー（ユーティリティ関数をラップ）
+    const calcPersonBalance = (personId: number) =>
+        getPersonBalance(db.lendings, personId);
 
-    // 外部相手の口座残高計算（純入出金 + 貸借）
-    const getPersonAccountBalance = (personId: number) => {
-        // 純入出金
-        const netFlowTotal = (db.personTransactions || [])
-            .filter(t => t.personId === personId)
-            .reduce((sum, t) => sum + (t.type === 'deposit' ? t.amount : -t.amount), 0);
+    const calcPersonAccountBalance = (personId: number) =>
+        getPersonAccountBalance(db.lendings, db.personTransactions || [], personId);
 
-        // 貸借（全履歴、returnレコードで相殺）
-        const relatedLendings = db.lendings.filter(l =>
-            l.personId === personId ||
-            (l.counterpartyType === 'person' && l.counterpartyId === personId)
-        );
-
-        const lendingEffect = relatedLendings.reduce((sum, l) => {
-            // lend = あなたが貸した = 相手が借りた = 相手の口座に+
-            // borrow = あなたが借りた = 相手が貸した = 相手の口座から-
-            // return = 元取引の逆符号（l.amount が既に逆符号で記録されている）
-            if (l.type === 'lend') return sum + Math.abs(l.amount);
-            if (l.type === 'borrow') return sum - Math.abs(l.amount);
-            if (l.type === 'return') return sum + l.amount; // 逆符号なのでそのまま加算
-            return sum;
-        }, 0);
-
-        return netFlowTotal + lendingEffect;
-    };
-
-    // 口座の貸借残高を計算（未返済のみ）
-    // 正の値 = 貸出超過（資産）、負の値 = 借入超過（負債）
-    const getAccountBalance = (accountId: number) => {
-        const relatedLendings = db.lendings.filter(l =>
-            (l.accountId === accountId ||
-             (l.counterpartyType === 'account' && l.counterpartyId === accountId)) &&
-            !l.returned
-        );
-
-        let balance = 0;
-        relatedLendings.forEach(l => {
-            if (l.accountId === accountId) {
-                // この口座が主体の取引
-                // lend（貸出）= 相手に貸している = 資産（+）
-                // borrow（借入）= 相手から借りている = 負債（-）
-                balance += l.type === 'lend' ? Math.abs(l.amount) : -Math.abs(l.amount);
-            }
-            if (l.counterpartyType === 'account' && l.counterpartyId === accountId) {
-                // この口座が相手方の取引（口座間取引の場合）
-                // 相手がlend = この口座はborrow（負債）
-                // 相手がborrow = この口座はlend（資産）
-                balance += l.type === 'lend' ? -Math.abs(l.amount) : Math.abs(l.amount);
-            }
-        });
-        return balance;
-    };
+    const calcAccountBalance = (accountId: number) =>
+        getAccountBalance(db.lendings, accountId);
 
     // フィルタ済み記録
     let lendings = [...db.lendings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -126,8 +72,8 @@ function LendingContent() {
         });
     }
 
-    const totalLent = activePersons.reduce((s, p) => { const b = getPersonBalance(p.id); return b > 0 ? s + b : s; }, 0);
-    const totalBorrowed = activePersons.reduce((s, p) => { const b = getPersonBalance(p.id); return b < 0 ? s + Math.abs(b) : s; }, 0);
+    // 貸借合計を計算
+    const { totalLent, totalBorrowed } = calculatePersonTotals(db.lendings, activePersons);
 
     // 統合履歴の作成（貸借 + 口座取引）- アーカイブ済みを除外
     const combinedHistory = [
@@ -244,7 +190,6 @@ function LendingContent() {
             isArchived: false
         }]);
         setNewAccountTags([]);
-        setNewTagInput('');
         setModalType(null);
     };
 
@@ -274,7 +219,6 @@ function LendingContent() {
             isArchived: false
         }]);
         setNewPersonTags([]);
-        setNewPersonTagInput('');
         setModalType(null);
     };
 
@@ -872,7 +816,7 @@ function LendingContent() {
             <h4 style={{ margin: '24px 0 16px' }}>💼 社内口座</h4>
             <div className="accounts-grid">
                 {filteredAccounts.map(account => {
-                    const lendingBalance = getAccountBalance(account.id);
+                    const lendingBalance = calcAccountBalance(account.id);
                     const business = db.businesses.find(b => b.id === account.businessId);
                     return (
                         <Link key={account.id} href={`/lending/account/${account.id}`} style={{ textDecoration: 'none' }}>
@@ -911,8 +855,8 @@ function LendingContent() {
             <h4 style={{ margin: '24px 0 16px' }}>👤 外部相手</h4>
             <div className="persons-grid">
                 {filteredPersons.map(person => {
-                    const balance = getPersonBalance(person.id);
-                    const accountBalance = getPersonAccountBalance(person.id);
+                    const balance = calcPersonBalance(person.id);
+                    const accountBalance = calcPersonAccountBalance(person.id);
                     const business = db.businesses.find(b => b.id === person.businessId);
                     return (
                         <Link key={person.id} href={`/lending/person/${person.id}`} style={{ textDecoration: 'none' }}>
@@ -1105,7 +1049,7 @@ function LendingContent() {
             </Modal>
 
             {/* 口座モーダル */}
-            <Modal isOpen={modalType === 'account'} onClose={() => { setModalType(null); setNewAccountTags([]); setNewTagInput(''); }} title="社内口座を追加">
+            <Modal isOpen={modalType === 'account'} onClose={() => { setModalType(null); setNewAccountTags([]); }} title="社内口座を追加">
                 <form onSubmit={saveAccount}>
                     <div className="form-group">
                         <label>口座名</label>
@@ -1124,81 +1068,18 @@ function LendingContent() {
                     </div>
                     <div className="form-group">
                         <label>タグ（任意）</label>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                            <input
-                                type="text"
-                                value={newTagInput}
-                                onChange={e => setNewTagInput(e.target.value)}
-                                placeholder="タグ名を入力"
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                                        e.preventDefault();
-                                        if (newTagInput.trim() && !newAccountTags.includes(newTagInput.trim())) {
-                                            setNewAccountTags([...newAccountTags, newTagInput.trim()]);
-                                            setNewTagInput('');
-                                        }
-                                    }
-                                }}
-                                style={{ flex: 1 }}
-                            />
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => {
-                                    if (newTagInput.trim() && !newAccountTags.includes(newTagInput.trim())) {
-                                        setNewAccountTags([...newAccountTags, newTagInput.trim()]);
-                                        setNewTagInput('');
-                                    }
-                                }}
-                            >
-                                追加
-                            </Button>
-                        </div>
-                        {newAccountTags.length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                                {newAccountTags.map(tag => (
-                                    <span
-                                        key={tag}
-                                        className="badge"
-                                        style={{ backgroundColor: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                    >
-                                        {tag}
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewAccountTags(newAccountTags.filter(t => t !== tag))}
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', fontSize: '14px' }}
-                                        >
-                                            ×
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        {db.tags.length > 0 && (
-                            <div style={{ marginTop: '8px' }}>
-                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>既存タグから選択:</p>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                    {db.tags.filter(t => !newAccountTags.includes(t.name)).map(tag => (
-                                        <button
-                                            key={tag.id}
-                                            type="button"
-                                            className="badge"
-                                            style={{ backgroundColor: tag.color || '#6366f1', cursor: 'pointer', border: 'none' }}
-                                            onClick={() => setNewAccountTags([...newAccountTags, tag.name])}
-                                        >
-                                            + {tag.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        <TagInput
+                            tags={newAccountTags}
+                            onTagsChange={setNewAccountTags}
+                            existingTags={db.tags}
+                        />
                     </div>
                     <Button type="submit" block>追加</Button>
                 </form>
             </Modal>
 
             {/* 相手モーダル */}
-            <Modal isOpen={modalType === 'person'} onClose={() => { setModalType(null); setNewPersonTags([]); setNewPersonTagInput(''); }} title="外部相手を追加">
+            <Modal isOpen={modalType === 'person'} onClose={() => { setModalType(null); setNewPersonTags([]); }} title="外部相手を追加">
                 <form onSubmit={savePerson}>
                     <div className="form-group">
                         <label>名前</label>
@@ -1217,74 +1098,11 @@ function LendingContent() {
                     </div>
                     <div className="form-group">
                         <label>タグ（任意）</label>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                            <input
-                                type="text"
-                                value={newPersonTagInput}
-                                onChange={e => setNewPersonTagInput(e.target.value)}
-                                placeholder="タグ名を入力"
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                                        e.preventDefault();
-                                        if (newPersonTagInput.trim() && !newPersonTags.includes(newPersonTagInput.trim())) {
-                                            setNewPersonTags([...newPersonTags, newPersonTagInput.trim()]);
-                                            setNewPersonTagInput('');
-                                        }
-                                    }
-                                }}
-                                style={{ flex: 1 }}
-                            />
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => {
-                                    if (newPersonTagInput.trim() && !newPersonTags.includes(newPersonTagInput.trim())) {
-                                        setNewPersonTags([...newPersonTags, newPersonTagInput.trim()]);
-                                        setNewPersonTagInput('');
-                                    }
-                                }}
-                            >
-                                追加
-                            </Button>
-                        </div>
-                        {newPersonTags.length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                                {newPersonTags.map(tag => (
-                                    <span
-                                        key={tag}
-                                        className="badge"
-                                        style={{ backgroundColor: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                    >
-                                        {tag}
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewPersonTags(newPersonTags.filter(t => t !== tag))}
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', fontSize: '14px' }}
-                                        >
-                                            ×
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        {db.tags.length > 0 && (
-                            <div style={{ marginTop: '8px' }}>
-                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>既存タグから選択:</p>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                    {db.tags.filter(t => !newPersonTags.includes(t.name)).map(tag => (
-                                        <button
-                                            key={tag.id}
-                                            type="button"
-                                            className="badge"
-                                            style={{ backgroundColor: tag.color || '#6366f1', cursor: 'pointer', border: 'none' }}
-                                            onClick={() => setNewPersonTags([...newPersonTags, tag.name])}
-                                        >
-                                            + {tag.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        <TagInput
+                            tags={newPersonTags}
+                            onTagsChange={setNewPersonTags}
+                            existingTags={db.tags}
+                        />
                     </div>
                     <Button type="submit" block>追加</Button>
                 </form>

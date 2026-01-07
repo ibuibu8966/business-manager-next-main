@@ -10,6 +10,7 @@ import { useDatabase, genId } from '@/lib/db';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { AccountTransaction } from '@/types';
+import { getAccountBalance } from '@/lib/lending/balance';
 
 function AccountDetailContent() {
     const params = useParams();
@@ -59,18 +60,8 @@ function AccountDetailContent() {
         t => t.accountId === accountId || t.fromAccountId === accountId || t.toAccountId === accountId
     );
 
-    // 貸借残高計算（貸借管理ページと同じロジック）
-    let lendingBalance = 0;
-    relatedLendings.filter(l => !l.returned).forEach(l => {
-        if (l.accountId === accountId) {
-            // この口座が主体の取引
-            lendingBalance += l.type === 'lend' ? Math.abs(l.amount) : -Math.abs(l.amount);
-        }
-        if (l.counterpartyType === 'account' && l.counterpartyId === accountId) {
-            // この口座が相手方の取引（口座間取引）
-            lendingBalance += l.type === 'lend' ? -Math.abs(l.amount) : Math.abs(l.amount);
-        }
-    });
+    // 貸借残高計算（共通ユーティリティを使用）
+    const lendingBalance = getAccountBalance(db.lendings, accountId);
 
     // 表示用に分離
     const lendingTotal = lendingBalance > 0 ? lendingBalance : 0;
