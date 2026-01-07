@@ -55,9 +55,11 @@ function AccountDetailContent() {
         )
     );
 
-    // この口座に関連する取引（移転・利息・運用益）
+    // この口座に関連する取引（移転・利息・運用益）- アーカイブ済みは除外
     const relatedTransactions = (db.accountTransactions || []).filter(
-        t => t.accountId === accountId || t.fromAccountId === accountId || t.toAccountId === accountId
+        t => !t.isArchived && (
+            t.accountId === accountId || t.fromAccountId === accountId || t.toAccountId === accountId
+        )
     );
 
     // 貸借残高計算（共通ユーティリティを使用）

@@ -43,9 +43,12 @@ function PersonDetailContent() {
     const business = person.businessId ? db.businesses.find(b => b.id === person.businessId) : null;
 
     // この相手に関連する貸借履歴（旧形式: personId、新形式: counterpartyType + counterpartyId）
+    // アーカイブ済みは除外
     const relatedLendings = db.lendings.filter(l =>
-        l.personId === personId ||
-        (l.counterpartyType === 'person' && l.counterpartyId === personId)
+        !l.isArchived && (
+            l.personId === personId ||
+            (l.counterpartyType === 'person' && l.counterpartyId === personId)
+        )
     );
 
     // 貸借合計計算（外部相手視点で表示）

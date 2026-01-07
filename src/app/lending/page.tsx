@@ -77,8 +77,12 @@ function LendingContent() {
     // 貸借合計を計算
     const { totalLent, totalBorrowed } = calculatePersonTotals(db.lendings, activePersons);
 
-    // 統合履歴の作成（貸借 + 口座取引）- アーカイブ済みを除外
-    const combinedHistory = createCombinedHistory(lendings, db.accountTransactions || []);
+    // 統合履歴の作成（貸借 + 口座取引 + 純入出金）- アーカイブ済みを除外
+    const combinedHistory = createCombinedHistory(
+        lendings,
+        db.accountTransactions || [],
+        db.personTransactions || []
+    );
 
     const saveLending = (e: React.FormEvent) => {
         e.preventDefault();
@@ -674,6 +678,9 @@ function LendingContent() {
                                         const person = db.persons.find(p => p.id === item.counterpartyId);
                                         detailText = person?.name || '?';
                                     }
+                                } else if (item.source === 'person-transaction') {
+                                    const person = db.persons.find(p => p.id === item.counterpartyId);
+                                    detailText = person?.name || '?';
                                 } else if (item.type === 'transfer') {
                                     const toAccount = db.accounts.find(a => a.id === item.toAccountId);
                                     detailText = `→ ${toAccount?.name || '?'}`;
@@ -707,30 +714,38 @@ function LendingContent() {
                                             {lastEditor?.name || '-'}
                                         </td>
                                         <td className="actions-cell">
-                                            <Link href={`/lending/transaction/${item.id}`}>
-                                                <Button size="sm" variant="ghost">詳細</Button>
-                                            </Link>
-                                            <Button size="sm" variant="secondary" onClick={() => {
-                                                setEditingTransaction({
-                                                    id: item.id,
-                                                    source: item.source,
-                                                    originalId: item.originalId,
-                                                    type: item.type,
-                                                    amount: item.amount,
-                                                    date: item.date,
-                                                    memo: item.memo,
-                                                    accountId: item.accountId,
-                                                    counterpartyType: item.source === 'lending' ? item.counterpartyType : undefined,
-                                                    counterpartyId: item.source === 'lending' ? item.counterpartyId : undefined,
-                                                    fromAccountId: item.source === 'transaction' ? item.accountId : undefined,
-                                                    toAccountId: item.source === 'transaction' ? item.toAccountId : undefined,
-                                                    returned: item.source === 'lending' ? item.returned : undefined,
-                                                });
-                                                setEditModalOpen(true);
-                                            }}>編集</Button>
-                                            <Button size="sm" variant="secondary" onClick={() => archiveTransaction(item)}>アーカイブ</Button>
-                                            {item.source === 'lending' && !item.returned && item.type !== 'return' && (
-                                                <Button size="sm" variant="success" onClick={() => markAsReturned(db.lendings.find(l => l.id === item.originalId)!)}>返済</Button>
+                                            {item.source === 'person-transaction' ? (
+                                                <Link href={`/lending/person/${item.counterpartyId}`}>
+                                                    <Button size="sm" variant="ghost">相手詳細</Button>
+                                                </Link>
+                                            ) : (
+                                                <>
+                                                    <Link href={`/lending/transaction/${item.id}`}>
+                                                        <Button size="sm" variant="ghost">詳細</Button>
+                                                    </Link>
+                                                    <Button size="sm" variant="secondary" onClick={() => {
+                                                        setEditingTransaction({
+                                                            id: item.id,
+                                                            source: item.source as 'lending' | 'transaction',
+                                                            originalId: item.originalId,
+                                                            type: item.type,
+                                                            amount: item.amount,
+                                                            date: item.date,
+                                                            memo: item.memo,
+                                                            accountId: item.accountId,
+                                                            counterpartyType: item.source === 'lending' ? item.counterpartyType : undefined,
+                                                            counterpartyId: item.source === 'lending' ? item.counterpartyId : undefined,
+                                                            fromAccountId: item.source === 'transaction' ? item.accountId : undefined,
+                                                            toAccountId: item.source === 'transaction' ? item.toAccountId : undefined,
+                                                            returned: item.source === 'lending' ? item.returned : undefined,
+                                                        });
+                                                        setEditModalOpen(true);
+                                                    }}>編集</Button>
+                                                    <Button size="sm" variant="secondary" onClick={() => archiveTransaction(item)}>アーカイブ</Button>
+                                                    {item.source === 'lending' && !item.returned && item.type !== 'return' && (
+                                                        <Button size="sm" variant="success" onClick={() => markAsReturned(db.lendings.find(l => l.id === item.originalId)!)}>返済</Button>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                     </tr>
