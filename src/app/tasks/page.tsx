@@ -656,8 +656,6 @@ function TasksContent() {
                                 {task.checklistBlocks && task.checklistBlocks.length > 0 && (() => {
                                     const checkboxItems = task.checklistBlocks.filter(b => b.type === 'checkbox');
                                     if (checkboxItems.length === 0) return null;
-                                    const displayItems = checkboxItems.slice(0, 5);
-                                    const remainingCount = checkboxItems.length - 5;
                                     return (
                                         <div
                                             style={{
@@ -669,7 +667,7 @@ function TasksContent() {
                                             }}
                                             onClick={e => e.stopPropagation()}
                                         >
-                                            {displayItems.map(item => (
+                                            {checkboxItems.map(item => (
                                                 <div
                                                     key={item.id}
                                                     style={{
@@ -714,15 +712,6 @@ function TasksContent() {
                                                     </span>
                                                 </div>
                                             ))}
-                                            {remainingCount > 0 && (
-                                                <div style={{
-                                                    color: 'var(--text-muted)',
-                                                    fontSize: '12px',
-                                                    paddingTop: '6px'
-                                                }}>
-                                                    他 {remainingCount} 件...
-                                                </div>
-                                            )}
                                         </div>
                                     );
                                 })()}
