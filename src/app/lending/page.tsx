@@ -80,7 +80,7 @@ function LendingContent() {
     // 統合履歴の作成（貸借 + 口座取引）- アーカイブ済みを除外
     const combinedHistory = createCombinedHistory(lendings, db.accountTransactions || []);
 
-    const saveLending = async (e: React.FormEvent) => {
+    const saveLending = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -90,7 +90,7 @@ function LendingContent() {
         const accountIdNum = parseInt(formData.get('accountId') as string);
 
         // 残高を更新（借入=+、貸出=-）
-        await updateCollection('accounts', items =>
+        updateCollection('accounts', items =>
             items.map(a => a.id === accountIdNum ? {
                 ...a,
                 balance: (a.balance || 0) + (type === 'borrow' ? amount : -amount)
@@ -99,7 +99,7 @@ function LendingContent() {
 
         // 貸借記録を追加
         const newLendingId = genId(db.lendings);
-        await updateCollection('lendings', items => [...items, {
+        updateCollection('lendings', items => [...items, {
             id: newLendingId,
             accountId: accountIdNum,
             counterpartyType: counterparty[0] as 'account' | 'person',
@@ -114,7 +114,7 @@ function LendingContent() {
         }]);
 
         // 履歴を記録
-        await updateCollection('lendingHistories', items => [...items, {
+        updateCollection('lendingHistories', items => [...items, {
             id: genId(items),
             lendingId: newLendingId,
             action: 'created' as const,
@@ -236,7 +236,7 @@ function LendingContent() {
         updateCollection('tags', items => items.filter(t => t.id !== tagId));
     };
 
-    const saveTransfer = async (e: React.FormEvent) => {
+    const saveTransfer = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -245,7 +245,7 @@ function LendingContent() {
         const amount = parseInt(formData.get('amount') as string);
 
         // 残高を更新（振替元から減算、振替先に加算）
-        await updateCollection('accounts', items =>
+        updateCollection('accounts', items =>
             items.map(a => {
                 if (a.id === fromAccountId) return { ...a, balance: (a.balance || 0) - amount };
                 if (a.id === toAccountId) return { ...a, balance: (a.balance || 0) + amount };
@@ -254,7 +254,7 @@ function LendingContent() {
         );
 
         const newTransactionId = genId(db.accountTransactions || []);
-        await updateCollection('accountTransactions', items => [...items, {
+        updateCollection('accountTransactions', items => [...items, {
             id: newTransactionId,
             type: 'transfer' as const,
             fromAccountId,
@@ -267,7 +267,7 @@ function LendingContent() {
         }]);
 
         // 履歴を記録
-        await updateCollection('accountTransactionHistories', items => [...items, {
+        updateCollection('accountTransactionHistories', items => [...items, {
             id: genId(items),
             accountTransactionId: newTransactionId,
             action: 'created' as const,
@@ -279,7 +279,7 @@ function LendingContent() {
         setModalType(null);
     };
 
-    const saveIncome = async (e: React.FormEvent) => {
+    const saveIncome = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -293,7 +293,7 @@ function LendingContent() {
 
         // 残高を更新（自社口座の場合のみ）
         if (accountId) {
-            await updateCollection('accounts', items =>
+            updateCollection('accounts', items =>
                 items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + amount } : a)
             );
         }
@@ -306,7 +306,7 @@ function LendingContent() {
 
         // 口座取引に追加
         const newTransactionId = genId(db.accountTransactions || []);
-        await updateCollection('accountTransactions', items => [...items, {
+        updateCollection('accountTransactions', items => [...items, {
             id: newTransactionId,
             type: incomeType,
             accountId,
@@ -320,7 +320,7 @@ function LendingContent() {
         }]);
 
         // 履歴を記録
-        await updateCollection('accountTransactionHistories', items => [...items, {
+        updateCollection('accountTransactionHistories', items => [...items, {
             id: genId(items),
             accountTransactionId: newTransactionId,
             action: 'created' as const,
@@ -335,7 +335,7 @@ function LendingContent() {
             const categoryName = incomeType === 'interest' ? '受取利息' : '運用損益';
             const account = db.accounts.find(a => a.id === parseInt(targetId));
 
-            await updateCollection('transactions', items => [...items, {
+            updateCollection('transactions', items => [...items, {
                 id: linkedTransactionId,
                 type: isLoss ? 'expense' as const : 'income' as const,
                 businessId: account?.businessId || 1,
@@ -351,7 +351,7 @@ function LendingContent() {
         setModalType(null);
     };
 
-    const markAsReturned = async (lending: Lending) => {
+    const markAsReturned = (lending: Lending) => {
         // 返済時に残高を更新
         // 貸出の返済: 残高 + amount（お金が戻ってくる）
         // 借入の返済: 残高 - |amount|（お金を返す）
@@ -359,14 +359,14 @@ function LendingContent() {
             ? Math.abs(lending.amount)  // 貸出の返済: お金が戻る
             : -Math.abs(lending.amount); // 借入の返済: お金を返す
 
-        await updateCollection('accounts', items =>
+        updateCollection('accounts', items =>
             items.map(a => a.id === lending.accountId ? {
                 ...a,
                 balance: (a.balance || 0) + balanceChange
             } : a)
         );
 
-        await updateCollection('lendings', items => [
+        updateCollection('lendings', items => [
             ...items.map(l => l.id === lending.id ? { ...l, returned: true } : l),
             {
                 id: genId(items),
@@ -385,7 +385,7 @@ function LendingContent() {
         ]);
     };
 
-    const deleteLending = async (id: number) => {
+    const deleteLending = (id: number) => {
         const lending = db.lendings.find(l => l.id === id);
         if (!lending) return;
 
@@ -399,7 +399,7 @@ function LendingContent() {
                     ? -Math.abs(lending.amount)  // 借入の削除: 残高を減らす
                     : Math.abs(lending.amount);  // 貸出の削除: 残高を戻す
 
-                await updateCollection('accounts', items =>
+                updateCollection('accounts', items =>
                     items.map(a => a.id === lending.accountId ? {
                         ...a,
                         balance: (a.balance || 0) + balanceChange
@@ -407,11 +407,11 @@ function LendingContent() {
                 );
             }
 
-            await updateCollection('lendings', items => items.filter(l => l.id !== id));
+            updateCollection('lendings', items => items.filter(l => l.id !== id));
         }
     };
 
-    const deleteAccountTransaction = async (id: number) => {
+    const deleteAccountTransaction = (id: number) => {
         const transaction = (db.accountTransactions || []).find(t => t.id === id);
         if (!transaction) return;
 
@@ -426,7 +426,7 @@ function LendingContent() {
                     balanceChange = transaction.amount; // 減算していた分を加算
                 } else if (transaction.type === 'transfer') {
                     // 振替の場合は from/to 両方を更新
-                    await updateCollection('accounts', items =>
+                    updateCollection('accounts', items =>
                         items.map(a => {
                             if (a.id === transaction.fromAccountId) {
                                 return { ...a, balance: (a.balance || 0) + transaction.amount };
@@ -440,7 +440,7 @@ function LendingContent() {
                 }
 
                 if (transaction.type !== 'transfer' && balanceChange !== 0) {
-                    await updateCollection('accounts', items =>
+                    updateCollection('accounts', items =>
                         items.map(a => a.id === accountId ? {
                             ...a,
                             balance: (a.balance || 0) + balanceChange
@@ -449,12 +449,12 @@ function LendingContent() {
                 }
             }
 
-            await updateCollection('accountTransactions', items => items.filter(t => t.id !== id));
+            updateCollection('accountTransactions', items => items.filter(t => t.id !== id));
         }
     };
 
     // アーカイブ処理（残高から除外）
-    const archiveTransaction = async (item: typeof combinedHistory[0]) => {
+    const archiveTransaction = (item: typeof combinedHistory[0]) => {
         if (!confirm('この取引をアーカイブしますか？\n※アーカイブすると残高計算から除外されます')) return;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -463,16 +463,16 @@ function LendingContent() {
         if (item.source === 'lending') {
             const lending = db.lendings.find(l => l.id === item.originalId);
             if (!lending) return;
-            await archiveLending(lending, updateCollectionCompat, genId, user?.id);
+            archiveLending(lending, updateCollectionCompat, genId, user?.id);
         } else {
             const transaction = (db.accountTransactions || []).find(t => t.id === item.originalId);
             if (!transaction) return;
-            await archiveAccountTransaction(transaction, updateCollectionCompat, genId, user?.id);
+            archiveAccountTransaction(transaction, updateCollectionCompat, genId, user?.id);
         }
     };
 
     // 編集保存処理（ユーティリティ関数に委譲）
-    const handleEditSave = async (
+    const handleEditSave = (
         source: 'lending' | 'transaction',
         originalId: number,
         updates: Partial<Lending> | Partial<AccountTransaction>,
@@ -483,7 +483,7 @@ function LendingContent() {
         const updateCollectionCompat = updateCollection as any;
 
         if (source === 'lending') {
-            await saveLendingEdit(
+            saveLendingEdit(
                 db,
                 updateCollectionCompat,
                 genId,
@@ -493,7 +493,7 @@ function LendingContent() {
                 changes
             );
         } else {
-            await saveTransactionEdit(
+            saveTransactionEdit(
                 { accountTransactions: db.accountTransactions || [], transactions: db.transactions },
                 updateCollectionCompat,
                 genId,

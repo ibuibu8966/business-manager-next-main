@@ -3,7 +3,7 @@
  * 編集・アーカイブ等の複雑なビジネスロジックを集約
  */
 
-import { Lending, AccountTransaction, Account } from '@/types';
+import { Lending, AccountTransaction } from '@/types';
 import { FieldChange } from '@/components/lending/TransactionEditModal';
 import {
     calculateLendingBalanceChange,
@@ -30,7 +30,7 @@ export function generateChangesDescription(changes: FieldChange[]): string {
 /**
  * 貸借レコードの編集を保存
  */
-export async function saveLendingEdit(
+export function saveLendingEdit(
     db: { lendings: Lending[] },
     updateCollection: UpdateCollectionFn,
     genId: GenIdFn,
@@ -38,7 +38,7 @@ export async function saveLendingEdit(
     originalId: number,
     updates: Partial<Lending>,
     changes: FieldChange[]
-): Promise<void> {
+): void {
     if (changes.length === 0) return;
 
     const oldLending = db.lendings.find(l => l.id === originalId);
@@ -53,7 +53,7 @@ export async function saveLendingEdit(
             oldLending.amount,
             true // reversing
         );
-        await updateCollection('accounts', createSingleAccountBalanceUpdater(
+        updateCollection('accounts', createSingleAccountBalanceUpdater(
             oldLending.accountId,
             oldBalanceChange
         ));
@@ -66,14 +66,14 @@ export async function saveLendingEdit(
 
     if (!oldLending.returned) {
         const newBalanceChange = calculateLendingBalanceChange(newType, newAmount);
-        await updateCollection('accounts', createSingleAccountBalanceUpdater(
+        updateCollection('accounts', createSingleAccountBalanceUpdater(
             newAccountId,
             newBalanceChange
         ));
     }
 
     // レコードを更新
-    await updateCollection('lendings', (items: Lending[]) =>
+    updateCollection('lendings', (items: Lending[]) =>
         items.map(l => l.id === originalId ? {
             ...l,
             ...updates,
@@ -83,7 +83,7 @@ export async function saveLendingEdit(
     );
 
     // 履歴を記録
-    await updateCollection('lendingHistories', (items: { id: number }[]) => [...items, {
+    updateCollection('lendingHistories', (items: { id: number }[]) => [...items, {
         id: genId(items),
         lendingId: originalId,
         action: 'updated' as const,
@@ -97,7 +97,7 @@ export async function saveLendingEdit(
 /**
  * 口座取引レコードの編集を保存
  */
-export async function saveTransactionEdit(
+export function saveTransactionEdit(
     db: { accountTransactions: AccountTransaction[]; transactions?: { id: number }[] },
     updateCollection: UpdateCollectionFn,
     genId: GenIdFn,
@@ -105,7 +105,7 @@ export async function saveTransactionEdit(
     originalId: number,
     updates: Partial<AccountTransaction>,
     changes: FieldChange[]
-): Promise<void> {
+): void {
     if (changes.length === 0) return;
 
     const oldTransaction = (db.accountTransactions || []).find(t => t.id === originalId);
@@ -117,7 +117,7 @@ export async function saveTransactionEdit(
     const oldAccountId = oldTransaction.accountId || oldTransaction.fromAccountId;
     if (oldAccountId) {
         if (oldTransaction.type === 'transfer') {
-            await updateCollection('accounts', createTransferBalanceUpdater(
+            updateCollection('accounts', createTransferBalanceUpdater(
                 oldTransaction.fromAccountId,
                 oldTransaction.toAccountId,
                 oldTransaction.amount,
@@ -129,7 +129,7 @@ export async function saveTransactionEdit(
                 oldTransaction.amount,
                 true // reversing
             );
-            await updateCollection('accounts', createSingleAccountBalanceUpdater(
+            updateCollection('accounts', createSingleAccountBalanceUpdater(
                 oldAccountId,
                 balanceChange
             ));
@@ -143,7 +143,7 @@ export async function saveTransactionEdit(
     if (newType === 'transfer') {
         const newFromId = updates.fromAccountId || oldTransaction.fromAccountId;
         const newToId = updates.toAccountId || oldTransaction.toAccountId;
-        await updateCollection('accounts', createTransferBalanceUpdater(
+        updateCollection('accounts', createTransferBalanceUpdater(
             newFromId,
             newToId,
             newAmount
@@ -151,14 +151,14 @@ export async function saveTransactionEdit(
     } else {
         const newAccountId = updates.accountId || oldTransaction.accountId;
         const balanceChange = calculateTransactionBalanceChange(newType, newAmount);
-        await updateCollection('accounts', createSingleAccountBalanceUpdater(
+        updateCollection('accounts', createSingleAccountBalanceUpdater(
             newAccountId,
             balanceChange
         ));
     }
 
     // レコードを更新
-    await updateCollection('accountTransactions', (items: AccountTransaction[]) =>
+    updateCollection('accountTransactions', (items: AccountTransaction[]) =>
         items.map(t => t.id === originalId ? {
             ...t,
             ...updates,
@@ -168,7 +168,7 @@ export async function saveTransactionEdit(
     );
 
     // 履歴を記録
-    await updateCollection('accountTransactionHistories', (items: { id: number }[]) => [...items, {
+    updateCollection('accountTransactionHistories', (items: { id: number }[]) => [...items, {
         id: genId(items),
         accountTransactionId: originalId,
         action: 'updated' as const,
@@ -183,7 +183,7 @@ export async function saveTransactionEdit(
         const isLoss = newAmount < 0;
         const categoryName = oldTransaction.type === 'interest' ? '受取利息' : '運用損益';
 
-        await updateCollection('transactions', (items: { id: number; type?: string; category?: string; amount?: number; date?: string; memo?: string }[]) =>
+        updateCollection('transactions', (items: { id: number; type?: string; category?: string; amount?: number; date?: string; memo?: string }[]) =>
             items.map(t => t.id === oldTransaction.linkedTransactionId ? {
                 ...t,
                 type: isLoss ? 'expense' : 'income',
@@ -203,12 +203,12 @@ export async function saveTransactionEdit(
  * @param genId ID生成関数
  * @param userId 操作ユーザーID
  */
-export async function archiveLending(
+export function archiveLending(
     lending: Lending,
     updateCollection: UpdateCollectionFn,
     genId: GenIdFn,
     userId: number | undefined
-): Promise<void> {
+): void {
     // 残高を戻す（未返済の場合のみ）
     if (!lending.returned) {
         const balanceChange = calculateLendingBalanceChange(
@@ -216,14 +216,14 @@ export async function archiveLending(
             lending.amount,
             true // reversing
         );
-        await updateCollection('accounts', createSingleAccountBalanceUpdater(
+        updateCollection('accounts', createSingleAccountBalanceUpdater(
             lending.accountId,
             balanceChange
         ));
     }
 
     // アーカイブフラグを設定
-    await updateCollection('lendings', (items: Lending[]) =>
+    updateCollection('lendings', (items: Lending[]) =>
         items.map(l => l.id === lending.id ? {
             ...l,
             isArchived: true,
@@ -233,7 +233,7 @@ export async function archiveLending(
     );
 
     // 履歴を記録
-    await updateCollection('lendingHistories', (items: { id: number }[]) => [...items, {
+    updateCollection('lendingHistories', (items: { id: number }[]) => [...items, {
         id: genId(items),
         lendingId: lending.id,
         action: 'archived' as const,
@@ -250,17 +250,17 @@ export async function archiveLending(
  * @param genId ID生成関数
  * @param userId 操作ユーザーID
  */
-export async function archiveAccountTransaction(
+export function archiveAccountTransaction(
     transaction: AccountTransaction,
     updateCollection: UpdateCollectionFn,
     genId: GenIdFn,
     userId: number | undefined
-): Promise<void> {
+): void {
     // 残高を戻す
     const accountId = transaction.accountId || transaction.fromAccountId;
     if (accountId) {
         if (transaction.type === 'transfer') {
-            await updateCollection('accounts', createTransferBalanceUpdater(
+            updateCollection('accounts', createTransferBalanceUpdater(
                 transaction.fromAccountId,
                 transaction.toAccountId,
                 transaction.amount,
@@ -272,7 +272,7 @@ export async function archiveAccountTransaction(
                 transaction.amount,
                 true // reversing
             );
-            await updateCollection('accounts', createSingleAccountBalanceUpdater(
+            updateCollection('accounts', createSingleAccountBalanceUpdater(
                 accountId,
                 balanceChange
             ));
@@ -280,7 +280,7 @@ export async function archiveAccountTransaction(
     }
 
     // アーカイブフラグを設定
-    await updateCollection('accountTransactions', (items: AccountTransaction[]) =>
+    updateCollection('accountTransactions', (items: AccountTransaction[]) =>
         items.map(t => t.id === transaction.id ? {
             ...t,
             isArchived: true,
@@ -290,7 +290,7 @@ export async function archiveAccountTransaction(
     );
 
     // 履歴を記録
-    await updateCollection('accountTransactionHistories', (items: { id: number }[]) => [...items, {
+    updateCollection('accountTransactionHistories', (items: { id: number }[]) => [...items, {
         id: genId(items),
         accountTransactionId: transaction.id,
         action: 'archived' as const,
@@ -301,7 +301,7 @@ export async function archiveAccountTransaction(
 
     // 管理会計連携: linkedTransactionIdがあればtransactionsも削除
     if (transaction.linkedTransactionId) {
-        await updateCollection('transactions', (items: { id: number }[]) =>
+        updateCollection('transactions', (items: { id: number }[]) =>
             items.filter(t => t.id !== transaction.linkedTransactionId)
         );
     }

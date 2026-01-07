@@ -33,7 +33,7 @@ function NewTaskContent() {
         setChecklistBlocks(undefined);
     };
 
-    const saveTask = async (e: React.FormEvent) => {
+    const saveTask = (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
@@ -57,20 +57,17 @@ function NewTaskContent() {
         };
 
         const newId = genId(db.tasks);
-        const insertResults = await updateCollection('tasks', tasks => [
+        updateCollection('tasks', tasks => [
             ...tasks,
             { id: newId, ...taskData, createdAt: new Date().toISOString() }
         ]);
 
-        // Supabaseから返されたIDを使用（なければローカルID）
-        const actualTaskId = insertResults.length > 0 ? insertResults[0].supabaseId : newId;
-
-        // 履歴を追加
+        // ローカルIDで履歴を追加（Supabase IDは後でバックグラウンドで更新される）
         updateCollection('taskHistories', histories => [
             ...histories,
             {
                 id: genId(histories),
-                taskId: actualTaskId,
+                taskId: newId,
                 action: 'created' as const,
                 description: 'タスクを作成',
                 userId: user?.id || 1,

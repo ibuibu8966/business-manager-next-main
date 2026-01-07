@@ -137,9 +137,9 @@ function TaskDetailContent() {
     };
 
     // タスク削除
-    const deleteTask = async () => {
+    const deleteTask = () => {
         if (confirm('このタスクを削除しますか？')) {
-            await updateCollection('taskHistories', histories => [
+            updateCollection('taskHistories', histories => [
                 ...histories,
                 {
                     id: genId(histories),

@@ -173,7 +173,7 @@ function TasksContent() {
         setChecklistBlocks(undefined);
     };
 
-    const saveTask = async (e: React.FormEvent) => {
+    const saveTask = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -203,13 +203,12 @@ function TasksContent() {
             addHistory(editingTask.id, 'updated', 'タスクを編集');
         } else {
             const newId = genId(db.tasks);
-            const insertResults = await updateCollection('tasks', tasks => [
+            updateCollection('tasks', tasks => [
                 ...tasks,
                 { id: newId, ...taskData, createdAt: new Date().toISOString() }
             ]);
-            // Supabaseから返されたIDを使用（なければローカルID）
-            const actualTaskId = insertResults.length > 0 ? insertResults[0].supabaseId : newId;
-            addHistory(actualTaskId, 'created', 'タスクを作成');
+            // ローカルIDで履歴を追加（Supabase IDは後でバックグラウンドで更新される）
+            addHistory(newId, 'created', 'タスクを作成');
         }
         setModalOpen(false);
     };
@@ -251,13 +250,13 @@ function TasksContent() {
         addHistory(task.id, 'reminder', '非表示を解除');
     };
 
-    const deleteTask = async (id: number) => {
+    const deleteTask = (id: number) => {
         const task = db.tasks.find(t => t.id === id);
         if (!task) return;
 
         if (confirm('このタスクを削除しますか？')) {
             // 先に履歴を追加してから削除（Supabaseの外部キー制約対応）
-            await updateCollection('taskHistories', histories => [
+            updateCollection('taskHistories', histories => [
                 ...histories,
                 {
                     id: genId(histories),

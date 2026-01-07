@@ -86,7 +86,7 @@ function AccountDetailContent() {
         setEditModalOpen(false);
     };
 
-    const saveTransfer = async (e: React.FormEvent) => {
+    const saveTransfer = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -106,13 +106,13 @@ function AccountDetailContent() {
             createdAt: new Date().toISOString()
         };
 
-        await updateCollection('accountTransactions', items => [
+        updateCollection('accountTransactions', items => [
             ...items,
             { id: genId(items), ...newTransaction }
         ]);
 
         // 残高更新（振替元から減算、振替先に加算）
-        await updateCollection('accounts', items =>
+        updateCollection('accounts', items =>
             items.map(a => {
                 if (a.id === accountId) {
                     return { ...a, balance: (a.balance || 0) - amount };
@@ -127,7 +127,7 @@ function AccountDetailContent() {
         setTransferModalOpen(false);
     };
 
-    const saveIncome = async (e: React.FormEvent) => {
+    const saveIncome = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -137,7 +137,7 @@ function AccountDetailContent() {
         const memo = formData.get('memo') as string;
 
         // AccountTransactionに追加
-        await updateCollection('accountTransactions', items => [
+        updateCollection('accountTransactions', items => [
             ...items,
             {
                 id: genId(items),
@@ -151,14 +151,14 @@ function AccountDetailContent() {
         ]);
 
         // 残高更新
-        await updateCollection('accounts', items =>
+        updateCollection('accounts', items =>
             items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + amount } : a)
         );
 
         // 管理会計（transactions）にも追加（運用損の場合はexpense）
         const isLoss = amount < 0;
         const categoryName = incomeType === 'interest' ? '受取利息' : '運用損益';
-        await updateCollection('transactions', items => [
+        updateCollection('transactions', items => [
             ...items,
             {
                 id: genId(items),
@@ -175,7 +175,7 @@ function AccountDetailContent() {
         setIncomeModalOpen(false);
     };
 
-    const saveNetFlow = async (e: React.FormEvent) => {
+    const saveNetFlow = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -185,7 +185,7 @@ function AccountDetailContent() {
         const memo = formData.get('memo') as string;
 
         // AccountTransactionに追加
-        await updateCollection('accountTransactions', items => [
+        updateCollection('accountTransactions', items => [
             ...items,
             {
                 id: genId(items),
@@ -200,7 +200,7 @@ function AccountDetailContent() {
 
         // 残高更新（純入金なら加算、純出金なら減算）
         const balanceChange = netFlowType === 'deposit' ? amount : -amount;
-        await updateCollection('accounts', items =>
+        updateCollection('accounts', items =>
             items.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + balanceChange } : a)
         );
 
