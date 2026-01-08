@@ -27,6 +27,16 @@ function LendingContent() {
     // 編集モーダル用
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<CombinedTransaction | null>(null);
+    // 純入出金編集モーダル用
+    const [personTransactionModalOpen, setPersonTransactionModalOpen] = useState(false);
+    const [editingPersonTransaction, setEditingPersonTransaction] = useState<{
+        id: number;
+        type: 'deposit' | 'withdrawal';
+        personId: number;
+        amount: number;
+        date: string;
+        memo?: string;
+    } | null>(null);
 
     if (!db) return <div>Loading...</div>;
 
@@ -457,10 +467,46 @@ function LendingContent() {
         }
     };
 
-    const deletePersonTransaction = (id: number) => {
-        if (confirm('この純入出金を削除しますか？')) {
-            updateCollection('personTransactions', items => items.filter(t => t.id !== id));
-        }
+    const archivePersonTransaction = async (id: number) => {
+        if (!confirm('この純入出金をアーカイブしますか？\n※アーカイブすると残高計算から除外されます')) return;
+        await updateCollection('personTransactions', items =>
+            items.map(t => t.id === id ? {
+                ...t,
+                isArchived: true,
+                lastEditedByUserId: user?.id,
+                lastEditedAt: new Date().toISOString()
+            } : t)
+        );
+    };
+
+    // 純入出金の編集保存処理
+    const savePersonTransactionEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingPersonTransaction) return;
+
+        const form = e.target as HTMLFormElement;
+        const formData = new FormData(form);
+        const newType = formData.get('type') as 'deposit' | 'withdrawal';
+        const newAmount = parseInt(formData.get('amount') as string);
+        const newDate = formData.get('date') as string;
+        const newMemo = formData.get('memo') as string;
+        const newPersonId = parseInt(formData.get('personId') as string);
+
+        await updateCollection('personTransactions', items =>
+            items.map(t => t.id === editingPersonTransaction.id ? {
+                ...t,
+                type: newType,
+                amount: newAmount,
+                date: newDate,
+                memo: newMemo,
+                personId: newPersonId,
+                lastEditedByUserId: user?.id,
+                lastEditedAt: new Date().toISOString()
+            } : t)
+        );
+
+        setPersonTransactionModalOpen(false);
+        setEditingPersonTransaction(null);
     };
 
     // アーカイブ処理（残高から除外）
@@ -725,7 +771,21 @@ function LendingContent() {
                                                     <Link href={`/lending/person/${item.counterpartyId}`}>
                                                         <Button size="sm" variant="ghost">相手詳細</Button>
                                                     </Link>
-                                                    <Button size="sm" variant="danger" onClick={() => deletePersonTransaction(item.originalId)}>削除</Button>
+                                                    <Button size="sm" variant="secondary" onClick={() => {
+                                                        const pt = (db.personTransactions || []).find(t => t.id === item.originalId);
+                                                        if (pt) {
+                                                            setEditingPersonTransaction({
+                                                                id: pt.id,
+                                                                type: pt.type,
+                                                                personId: pt.personId,
+                                                                amount: pt.amount,
+                                                                date: pt.date,
+                                                                memo: pt.memo,
+                                                            });
+                                                            setPersonTransactionModalOpen(true);
+                                                        }
+                                                    }}>編集</Button>
+                                                    <Button size="sm" variant="secondary" onClick={() => archivePersonTransaction(item.originalId)}>アーカイブ</Button>
                                                 </>
                                             ) : (
                                                 <>
@@ -1020,6 +1080,47 @@ function LendingContent() {
                 persons={db.persons}
                 onSave={handleEditSave}
             />
+
+            {/* 純入出金編集モーダル */}
+            <Modal
+                isOpen={personTransactionModalOpen}
+                onClose={() => {
+                    setPersonTransactionModalOpen(false);
+                    setEditingPersonTransaction(null);
+                }}
+                title="純入出金を編集"
+            >
+                {editingPersonTransaction && (
+                    <form onSubmit={savePersonTransactionEdit}>
+                        <div className="form-group">
+                            <label>外部相手</label>
+                            <select name="personId" defaultValue={editingPersonTransaction.personId} required>
+                                {activePersons.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>種類</label>
+                            <select name="type" defaultValue={editingPersonTransaction.type} required>
+                                <option value="deposit">純入金（相手に渡す）</option>
+                                <option value="withdrawal">純出金（相手から受け取る）</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>金額</label>
+                            <input type="number" name="amount" min="1" defaultValue={editingPersonTransaction.amount} required />
+                        </div>
+                        <div className="form-group">
+                            <label>日付</label>
+                            <input type="date" name="date" defaultValue={editingPersonTransaction.date} required />
+                        </div>
+                        <div className="form-group">
+                            <label>メモ</label>
+                            <input type="text" name="memo" defaultValue={editingPersonTransaction.memo || ''} />
+                        </div>
+                        <Button type="submit" block>保存</Button>
+                    </form>
+                )}
+            </Modal>
         </AppLayout>
     );
 }

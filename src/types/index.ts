@@ -237,6 +237,9 @@ export interface PersonTransaction {
     date: string;
     memo?: string;
     createdAt: string;
+    isArchived?: boolean;
+    lastEditedByUserId?: number;
+    lastEditedAt?: string;
 }
 
 // タグマスタ

@@ -34,9 +34,9 @@ export function getPersonAccountBalance(
     personTransactions: PersonTransaction[],
     personId: number
 ): number {
-    // 純入出金
+    // 純入出金 - アーカイブ済みは除外
     const netFlowTotal = personTransactions
-        .filter(t => t.personId === personId)
+        .filter(t => !t.isArchived && t.personId === personId)
         .reduce((sum, t) => sum + (t.type === 'deposit' ? t.amount : -t.amount), 0);
 
     // 貸借（全履歴、returnレコードで相殺）- アーカイブ済みは除外

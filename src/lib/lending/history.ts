@@ -129,6 +129,7 @@ export function createCombinedHistory(
 
     // 外部相手取引（純入出金）を変換
     const personTransactionItems = personTransactions
+        .filter(t => !excludeArchived || !t.isArchived)
         .map(convertPersonTransactionToHistoryItem);
 
     // 統合してソート
