@@ -464,7 +464,7 @@ function LendingContent() {
     };
 
     // アーカイブ処理（残高から除外）
-    const archiveTransaction = (item: typeof combinedHistory[0]) => {
+    const archiveTransaction = async (item: typeof combinedHistory[0]) => {
         if (!confirm('この取引をアーカイブしますか？\n※アーカイブすると残高計算から除外されます')) return;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -473,16 +473,16 @@ function LendingContent() {
         if (item.source === 'lending') {
             const lending = db.lendings.find(l => l.id === item.originalId);
             if (!lending) return;
-            archiveLending(lending, updateCollectionCompat, genId, user?.id);
+            await archiveLending(lending, updateCollectionCompat, genId, user?.id);
         } else {
             const transaction = (db.accountTransactions || []).find(t => t.id === item.originalId);
             if (!transaction) return;
-            archiveAccountTransaction(transaction, updateCollectionCompat, genId, user?.id);
+            await archiveAccountTransaction(transaction, updateCollectionCompat, genId, user?.id);
         }
     };
 
     // 編集保存処理（ユーティリティ関数に委譲）
-    const handleEditSave = (
+    const handleEditSave = async (
         source: 'lending' | 'transaction',
         originalId: number,
         updates: Partial<Lending> | Partial<AccountTransaction>,
@@ -493,7 +493,7 @@ function LendingContent() {
         const updateCollectionCompat = updateCollection as any;
 
         if (source === 'lending') {
-            saveLendingEdit(
+            await saveLendingEdit(
                 db,
                 updateCollectionCompat,
                 genId,
@@ -503,7 +503,7 @@ function LendingContent() {
                 changes
             );
         } else {
-            saveTransactionEdit(
+            await saveTransactionEdit(
                 { accountTransactions: db.accountTransactions || [], transactions: db.transactions },
                 updateCollectionCompat,
                 genId,
