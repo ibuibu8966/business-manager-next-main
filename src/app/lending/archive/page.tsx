@@ -18,6 +18,7 @@ function ArchiveContent() {
     // アーカイブ済み取引履歴
     const archivedLendings = db.lendings.filter(l => l.isArchived);
     const archivedTransactions = (db.accountTransactions || []).filter(t => t.isArchived);
+    const archivedPersonTransactions = (db.personTransactions || []).filter(t => t.isArchived);
 
     const unarchiveAccount = (id: number) => {
         if (confirm('この口座のアーカイブを取り消しますか？')) {
@@ -50,7 +51,7 @@ function ArchiveContent() {
         }
     };
 
-    const hasArchivedItems = archivedAccounts.length > 0 || archivedPersons.length > 0 || archivedLendings.length > 0 || archivedTransactions.length > 0;
+    const hasArchivedItems = archivedAccounts.length > 0 || archivedPersons.length > 0 || archivedLendings.length > 0 || archivedTransactions.length > 0 || archivedPersonTransactions.length > 0;
 
     return (
         <AppLayout title="アーカイブ一覧">
@@ -198,7 +199,7 @@ function ArchiveContent() {
                         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
                             ※ 取引履歴のアーカイブは復活できません（閲覧のみ）
                         </p>
-                        {archivedLendings.length === 0 && archivedTransactions.length === 0 ? (
+                        {archivedLendings.length === 0 && archivedTransactions.length === 0 && archivedPersonTransactions.length === 0 ? (
                             <div style={{ color: 'var(--text-secondary)', padding: '1rem' }}>
                                 アーカイブ済みの取引はありません
                             </div>
@@ -271,6 +272,25 @@ function ArchiveContent() {
                                                             <Button size="sm" variant="ghost">詳細</Button>
                                                         </Link>
                                                     </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {/* アーカイブ済み純入出金履歴 */}
+                                        {archivedPersonTransactions.map(t => {
+                                            const person = db.persons.find(p => p.id === t.personId);
+                                            const displayType = t.type === 'deposit' ? '純入金' : '純出金';
+                                            const amount = t.type === 'deposit' ? t.amount : -t.amount;
+
+                                            return (
+                                                <tr key={`person-transaction-${t.id}`}>
+                                                    <td>{t.date}</td>
+                                                    <td>-</td>
+                                                    <td>{person?.name || '?'}</td>
+                                                    <td><span className="badge badge-secondary">{displayType}</span></td>
+                                                    <td style={{ color: amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                        {amount >= 0 ? '' : '-'}¥{Math.abs(amount).toLocaleString()}
+                                                    </td>
+                                                    <td>-</td>
                                                 </tr>
                                             );
                                         })}

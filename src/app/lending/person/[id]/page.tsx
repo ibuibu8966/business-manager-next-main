@@ -65,8 +65,8 @@ function PersonDetailContent() {
         .filter(l => l.type === 'lend' && !l.returned)
         .reduce((sum, l) => sum + Math.abs(l.amount), 0);
 
-    // 純入出金取引
-    const personTransactions = (db.personTransactions || []).filter(t => t.personId === personId);
+    // 純入出金取引（アーカイブ済みは除外）
+    const personTransactions = (db.personTransactions || []).filter(t => !t.isArchived && t.personId === personId);
 
     // 純入出金累計（外部相手視点）
     // deposit = 外部相手にお金が入る → プラス
