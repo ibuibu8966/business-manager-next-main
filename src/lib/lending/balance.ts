@@ -14,6 +14,7 @@ import { Lending, PersonTransaction } from '@/types';
 export function getPersonBalance(lendings: Lending[], personId: number): number {
     return lendings
         .filter(l =>
+            !l.isArchived &&
             ((l.counterpartyType === 'person' && l.counterpartyId === personId) ||
              (!l.counterpartyType && l.personId === personId)) &&
             !l.returned
@@ -38,10 +39,12 @@ export function getPersonAccountBalance(
         .filter(t => t.personId === personId)
         .reduce((sum, t) => sum + (t.type === 'deposit' ? t.amount : -t.amount), 0);
 
-    // 貸借（全履歴、returnレコードで相殺）
+    // 貸借（全履歴、returnレコードで相殺）- アーカイブ済みは除外
     const relatedLendings = lendings.filter(l =>
-        l.personId === personId ||
-        (l.counterpartyType === 'person' && l.counterpartyId === personId)
+        !l.isArchived && (
+            l.personId === personId ||
+            (l.counterpartyType === 'person' && l.counterpartyId === personId)
+        )
     );
 
     const lendingEffect = relatedLendings.reduce((sum, l) => {
@@ -65,6 +68,7 @@ export function getPersonAccountBalance(
  */
 export function getAccountBalance(lendings: Lending[], accountId: number): number {
     const relatedLendings = lendings.filter(l =>
+        !l.isArchived &&
         (l.accountId === accountId ||
          (l.counterpartyType === 'account' && l.counterpartyId === accountId)) &&
         !l.returned

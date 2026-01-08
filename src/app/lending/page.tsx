@@ -457,6 +457,12 @@ function LendingContent() {
         }
     };
 
+    const deletePersonTransaction = (id: number) => {
+        if (confirm('この純入出金を削除しますか？')) {
+            updateCollection('personTransactions', items => items.filter(t => t.id !== id));
+        }
+    };
+
     // アーカイブ処理（残高から除外）
     const archiveTransaction = (item: typeof combinedHistory[0]) => {
         if (!confirm('この取引をアーカイブしますか？\n※アーカイブすると残高計算から除外されます')) return;
@@ -715,9 +721,12 @@ function LendingContent() {
                                         </td>
                                         <td className="actions-cell">
                                             {item.source === 'person-transaction' ? (
-                                                <Link href={`/lending/person/${item.counterpartyId}`}>
-                                                    <Button size="sm" variant="ghost">相手詳細</Button>
-                                                </Link>
+                                                <>
+                                                    <Link href={`/lending/person/${item.counterpartyId}`}>
+                                                        <Button size="sm" variant="ghost">相手詳細</Button>
+                                                    </Link>
+                                                    <Button size="sm" variant="danger" onClick={() => deletePersonTransaction(item.originalId)}>削除</Button>
+                                                </>
                                             ) : (
                                                 <>
                                                     <Link href={`/lending/transaction/${item.id}`}>
